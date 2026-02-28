@@ -1,0 +1,183 @@
+"""
+Core negotiation agent loop.
+
+This is the main agentic loop that drives the negotiation brief generation.
+It uses the old openai SDK pattern (pre-1.0) with manual function call parsing.
+
+The agent makes multiple tool calls to gather context before synthesizing
+a negotiation brief. Typical flow:
+  1. property_lookup -- get property context
+  2. lease_comparables -- get market rate benchmarks
+  3. tower_utilization OR regulatory_lookup -- depending on provider type
+
+Originally written by dkim@ in 2023-Q1, refactored by jcrawford@ in 2023-Q3
+to add the provider/region system prompt injection.
+"""
+import os
+import json
+import importlib
+
+import openai
+
+from towerlease.tools import property_lookup
+from towerlease.tools import lease_comparables
+from towerlease.tools import tower_utilization
+from towerlease.tools import regulatory_lookup
+
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
+# Tool definitions in the old functions format
+TOOL_DEFINITIONS = [
+    property_lookup.TOOL_DEFINITION,
+    lease_comparables.TOOL_DEFINITION,
+    tower_utilization.TOOL_DEFINITION,
+    regulatory_lookup.TOOL_DEFINITION,
+]
+
+# Map function names to their implementation
+_TOOL_DISPATCH = {
+    "property_lookup": property_lookup.lookup,
+    "lease_comparables": lease_comparables.lookup,
+    "tower_utilization": tower_utilization.lookup,
+    "regulatory_lookup": regulatory_lookup.lookup,
+}
+
+
+def dispatch_tool(fn_name, fn_args):
+    """Dispatch a tool call to the appropriate function.
+
+    Args:
+        fn_name: name of the function to call
+        fn_args: dict of arguments parsed from the model response
+
+    Returns:
+        dict result from the tool function
+    """
+    handler = _TOOL_DISPATCH.get(fn_name)
+    if handler is None:
+        return {"error": "Unknown tool: %s" % fn_name}
+    try:
+        return handler(**fn_args)
+    except TypeError as e:
+        # This happens sometimes when the model passes unexpected args.
+        # We just return the error and let the model recover.
+        return {"error": "Tool call failed: %s" % str(e)}
+
+
+def _load_provider_module(provider):
+    """Dynamically load a provider module."""
+    return importlib.import_module("towerlease.providers.%s" % provider)
+
+
+def _load_region_module(region):
+    return importlib.import_module("towerlease.regions.%s" % region)
+
+
+def build_system_prompt(provider, region):
+    """Construct the system prompt by combining provider and region context.
+
+    The system prompt is assembled from:
+    1. Provider-specific negotiation guidance
+    2. Region market context
+    """
+    provider_mod = _load_provider_module(provider)
+    region_mod = _load_region_module(region)
+
+    provider_prompt = provider_mod.get_system_prompt(region)
+    market_context = region_mod.get_market_context()
+
+    system_prompt = provider_prompt + "\n\nREGION MARKET CONTEXT:\n" + market_context
+
+    system_prompt += (
+        "\n\nINSTRUCTIONS:\n"
+        "1. First, look up the property record for this tower site.\n"
+        "2. Then, pull comparable lease rates for this region and tower type.\n"
+        "3. Check tower utilization data to assess leverage position.\n"
+        "4. If the provider is municipal or the region has complex permitting, "
+        "also check regulatory context.\n"
+        "5. Synthesize all gathered data into a comprehensive negotiation brief.\n"
+        "6. Include specific rate recommendations with supporting evidence.\n"
+        "Always make your tool calls before providing your final analysis."
+    )
+
+    return system_prompt
+
+
+def build_initial_message(tower_id, lease_data, provider, region):
+    """Build the initial user message with tower data and provider context."""
+    provider_mod = _load_provider_module(provider)
+    context_block = provider_mod.get_context_block(lease_data)
+
+    msg = "Please prepare a negotiation brief for the following tower lease renewal:\n\n"
+    msg += "Tower ID: %s\n" % tower_id
+    msg += "Current Monthly Rate: $%s\n" % lease_data.get("current_monthly_rate", "N/A")
+    msg += "Lease Expiry: %s\n" % lease_data.get("lease_expiry", "N/A")
+    msg += "Years Remaining: %s\n" % lease_data.get("lease_years_remaining", "N/A")
+    msg += "\n" + context_block
+
+    return msg
+
+
+def run_negotiation_agent(tower_id, lease_data, provider, region):
+    """Execute the full negotiation agent loop.
+
+    This function runs a while loop that continues making ChatCompletion
+    calls until the model returns a final response (finish_reason == "stop").
+    The model can make function calls which are dispatched to mock tools
+    and the results fed back into the conversation.
+
+    Args:
+        tower_id: AT&T tower identifier
+        lease_data: dict with current lease terms
+        provider: provider identifier string
+        region: region identifier string
+
+    Returns:
+        tuple of (final_response_text, messages_list)
+    """
+    system_prompt = build_system_prompt(provider, region)
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": build_initial_message(tower_id, lease_data, provider, region)},
+    ]
+
+    # Agent loop -- keep calling until we get a stop response
+    max_iterations = 10  # safety valve, shouldn't need more than 5-6
+    iteration = 0
+
+    while iteration < max_iterations:
+        iteration += 1
+
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=messages,
+            functions=TOOL_DEFINITIONS,
+            function_call="auto",
+        )
+
+        message = response["choices"][0]["message"]
+        finish_reason = response["choices"][0]["finish_reason"]
+
+        if finish_reason == "function_call":
+            fn_name = message["function_call"]["name"]
+            fn_args = json.loads(message["function_call"]["arguments"])
+
+            result = dispatch_tool(fn_name, fn_args)
+
+            # Append the assistant message with the function call
+            messages.append(message)
+            # Append the function result
+            messages.append({
+                "role": "function",
+                "name": fn_name,
+                "content": json.dumps(result),
+            })
+
+        elif finish_reason == "stop":
+            messages.append(message)
+            return message["content"], messages
+
+    # If we hit max iterations, return whatever we have
+    # This shouldn't happen in practice but better than infinite loop
+    return messages[-1].get("content", "Agent loop exceeded maximum iterations"), messages
