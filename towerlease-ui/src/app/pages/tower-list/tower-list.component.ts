@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { TowerLeaseApiService } from '../../services/tower-lease-api.service';
 import { TowerInfo } from '../../models/tower-lease.models';
+import { TOWER_INVENTORY } from '../../data/tower-inventory';
 
 @Component({
   selector: 'app-tower-list',
@@ -43,8 +44,13 @@ export class TowerListComponent implements OnInit {
         this.applyFilters();
         this.loading = false;
       },
-      error: (err) => {
-        this.error = 'Failed to load tower inventory. Please try again.';
+      error: () => {
+        // Fall back to hardcoded inventory when backend is unavailable
+        this.towers = TOWER_INVENTORY;
+        this.providers = [...new Set(this.towers.map((t) => t.provider))].sort();
+        this.regions = [...new Set(this.towers.map((t) => t.region))].sort();
+        this.towerTypes = [...new Set(this.towers.map((t) => t.tower_type))].sort();
+        this.applyFilters();
         this.loading = false;
       },
     });
