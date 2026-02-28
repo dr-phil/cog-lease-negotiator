@@ -1,0 +1,117 @@
+.regulatory-page {
+  h2 { margin-bottom: 4px; }
+
+  .subtitle {
+    color: #888;
+    font-size: 13px;
+    margin-bottom: 20px;
+  }
+}
+
+.heatmap-table {
+  width: 100%;
+  border-collapse: collapse;
+
+  th, td {
+    text-align: center;
+    padding: 12px 16px;
+    border: 1px solid #e0e0e0;
+  }
+
+  th {
+    background: #f5f5f5;
+    font-weight: 600;
+    font-size: 13px;
+    color: #555;
+  }
+
+  .corner-cell {
+    background: #fff;
+    border-color: #fff #e0e0e0 #e0e0e0 #fff;
+  }
+
+  .region-label {
+    font-weight: 600;
+    text-align: left;
+    background: #f9f9f9;
+    min-width: 120px;
+  }
+}
+
+.heatmap-cell {
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.2s;
+  min-width: 120px;
+
+  &:hover {
+    box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.2);
+  }
+
+  .risk-badge {
+    font-weight: 700;
+    font-size: 14px;
+    margin-bottom: 4px;
+  }
+
+  .timeline-months {
+    font-size: 12px;
+    opacity: 0.8;
+  }
+}
+
+.risk-low {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.risk-moderate {
+  background-color: #fff3e0;
+  color: #e65100;
+}
+
+.risk-elevated {
+  background-color: #ffebee;
+  color: #c62828;
+}
+
+.expanded-row td {
+  padding: 0;
+  border: 1px solid #e0e0e0;
+}
+
+.expanded-panel {
+  background: #fafafa;
+  padding: 20px 24px;
+  text-align: left;
+
+  h4 {
+    margin-bottom: 12px;
+    font-size: 16px;
+  }
+
+  .detail-section {
+    margin-bottom: 12px;
+    font-size: 14px;
+
+    ul {
+      margin: 4px 0 0 20px;
+      padding: 0;
+
+      li {
+        margin-bottom: 4px;
+      }
+    }
+  }
+
+  .legislation {
+    background: #fff8e1;
+    border-left: 3px solid #ffa000;
+    padding: 12px;
+    border-radius: 4px;
+
+    p {
+      margin: 4px 0 0;
+      font-style: italic;
+    }
+  }
+}

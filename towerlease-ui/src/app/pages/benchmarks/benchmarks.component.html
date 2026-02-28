@@ -1,0 +1,40 @@
+<div class="benchmarks-page">
+  <h2>Regional Rate Benchmarks Dashboard</h2>
+
+  <div class="region-tabs">
+    <button
+      *ngFor="let region of regions"
+      class="tab-btn"
+      [class.active]="selectedRegion === region"
+      (click)="onRegionChange(region)"
+    >
+      {{ formatRegion(region) }}
+    </button>
+  </div>
+
+  <div class="card chart-card">
+    <canvas #chartCanvas></canvas>
+  </div>
+
+  <div class="card data-table-card">
+    <h3>Rate Details — {{ formatRegion(selectedRegion) }}</h3>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Tower Type</th>
+          <th>Low</th>
+          <th>Median</th>
+          <th>High</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let type of towerTypes">
+          <td>{{ formatType(type) }}</td>
+          <td>${{ (selectedRegion | benchmarkRate:type:'low') | number }}</td>
+          <td>${{ (selectedRegion | benchmarkRate:type:'median') | number }}</td>
+          <td>${{ (selectedRegion | benchmarkRate:type:'high') | number }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

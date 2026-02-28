@@ -1,0 +1,74 @@
+.comparables-page {
+  h2 { margin-bottom: 16px; }
+}
+
+.filters {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+
+  .filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #666;
+    }
+
+    select {
+      padding: 6px 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      min-width: 160px;
+    }
+  }
+
+  .filter-count {
+    font-size: 13px;
+    color: #888;
+    margin-left: auto;
+  }
+}
+
+.chart-card {
+  height: 380px;
+}
+
+.table-responsive {
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 800px;
+
+  th, td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid #eee;
+    white-space: nowrap;
+  }
+
+  th {
+    background: #f5f5f5;
+    font-weight: 600;
+    font-size: 13px;
+    color: #555;
+  }
+
+  .comp-id {
+    font-family: monospace;
+    font-weight: 600;
+  }
+
+  .rate {
+    font-weight: 600;
+    color: #1976d2;
+  }
+}

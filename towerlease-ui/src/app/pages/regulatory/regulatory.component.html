@@ -1,0 +1,58 @@
+<div class="regulatory-page">
+  <h2>Regulatory Risk Matrix</h2>
+  <p class="subtitle">Click any cell to view regulatory details and pending legislation.</p>
+
+  <div class="card">
+    <table class="heatmap-table">
+      <thead>
+        <tr>
+          <th class="corner-cell"></th>
+          <th *ngFor="let type of towerTypes">{{ formatLabel(type) }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <ng-container *ngFor="let region of regions">
+          <tr>
+            <td class="region-label">{{ formatLabel(region) }}</td>
+            <td *ngFor="let type of towerTypes"
+                class="heatmap-cell"
+                [ngClass]="getRiskClass(getCell(region, type).risk_level)"
+                (click)="toggleCell(region, type)">
+              <div class="risk-badge">{{ getCell(region, type).risk_level | titlecase }}</div>
+              <div class="timeline-months">{{ getCell(region, type).estimated_new_site_timeline_months }} mo</div>
+            </td>
+          </tr>
+          <tr *ngIf="expandedCell?.region === region" class="expanded-row">
+            <td [attr.colspan]="towerTypes.length + 1">
+              <div class="expanded-panel" *ngIf="expandedCell">
+                <h4>{{ formatLabel(expandedCell.region) }} — {{ formatLabel(expandedCell.towerType) }}</h4>
+                <div class="detail-section">
+                  <strong>Risk Level:</strong>
+                  <span [ngClass]="getRiskClass(getCell(expandedCell.region, expandedCell.towerType).risk_level)">
+                    {{ getCell(expandedCell.region, expandedCell.towerType).risk_level | titlecase }}
+                  </span>
+                </div>
+                <div class="detail-section">
+                  <strong>Estimated New Site Timeline:</strong>
+                  {{ getCell(expandedCell.region, expandedCell.towerType).estimated_new_site_timeline_months }} months
+                </div>
+                <div class="detail-section">
+                  <strong>Relevant Statutes:</strong>
+                  <ul>
+                    <li *ngFor="let statute of getCell(expandedCell.region, expandedCell.towerType).statutes">
+                      {{ statute }}
+                    </li>
+                  </ul>
+                </div>
+                <div class="detail-section legislation">
+                  <strong>Pending Legislation:</strong>
+                  <p>{{ getCell(expandedCell.region, expandedCell.towerType).pending_legislation }}</p>
+                </div>
+              </div>
+            </td>
+          </tr>
+        </ng-container>
+      </tbody>
+    </table>
+  </div>
+</div>

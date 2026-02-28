@@ -1,0 +1,48 @@
+<div class="timeline-page">
+  <h2>Lease Expiry Timeline</h2>
+  <p class="subtitle">Gantt-style view of lease expiry dates grouped by provider. Leases expiring within 6 months are highlighted as urgent.</p>
+
+  <div class="legend">
+    <span class="legend-item"><span class="bar-sample normal"></span> Active Lease</span>
+    <span class="legend-item"><span class="bar-sample urgent"></span> Expiring Soon (within 6 months)</span>
+    <span class="legend-item"><span class="now-line-sample"></span> Today</span>
+  </div>
+
+  <div class="card">
+    <div class="gantt-container">
+      <!-- Time axis -->
+      <div class="time-axis">
+        <div class="axis-label-spacer"></div>
+        <div class="axis-track">
+          <div class="month-marker" *ngFor="let m of timelineMonths"
+               [style.left.%]="m.position">
+            <span class="month-label">{{ m.label }}</span>
+          </div>
+          <div class="now-marker" [style.left.%]="getNowPosition()">
+            <span class="now-label">Today</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Provider groups -->
+      <div class="provider-section" *ngFor="let group of providerGroups">
+        <div class="provider-header">{{ group.label }}</div>
+        <div class="tower-row" *ngFor="let tower of group.towers">
+          <div class="tower-label">
+            <span class="tower-nickname">{{ tower.nickname }}</span>
+            <span class="tower-id">{{ tower.tower_id }}</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar"
+                 [class.urgent]="tower.isUrgent"
+                 [style.left.%]="tower.barLeft"
+                 [style.width.%]="tower.barWidth">
+              <span class="bar-date">{{ tower.lease_expiry }}</span>
+            </div>
+            <div class="now-line" [style.left.%]="getNowPosition()"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
