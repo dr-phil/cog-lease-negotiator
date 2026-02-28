@@ -8,6 +8,13 @@ import { AppComponent } from './app.component';
 import { TowerListComponent } from './pages/tower-list/tower-list.component';
 import { TowerDetailComponent } from './pages/tower-detail/tower-detail.component';
 import { NegotiationBriefComponent } from './pages/negotiation-brief/negotiation-brief.component';
+import { TowerMapComponent } from './pages/tower-map/tower-map.component';
+import { BenchmarksComponent } from './pages/benchmarks/benchmarks.component';
+import { BenchmarkRatePipe } from './pages/benchmarks/benchmark-rate.pipe';
+import { UtilizationComponent } from './pages/utilization/utilization.component';
+import { ComparablesComponent } from './pages/comparables/comparables.component';
+import { RegulatoryComponent } from './pages/regulatory/regulatory.component';
+import { TimelineComponent } from './pages/timeline/timeline.component';
 
 @NgModule({
   declarations: [
@@ -15,6 +22,13 @@ import { NegotiationBriefComponent } from './pages/negotiation-brief/negotiation
     TowerListComponent,
     TowerDetailComponent,
     NegotiationBriefComponent,
+    TowerMapComponent,
+    BenchmarksComponent,
+    BenchmarkRatePipe,
+    UtilizationComponent,
+    ComparablesComponent,
+    RegulatoryComponent,
+    TimelineComponent,
   ],
   imports: [
     BrowserModule,

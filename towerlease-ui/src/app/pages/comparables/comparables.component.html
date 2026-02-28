@@ -1,0 +1,67 @@
+<div class="comparables-page">
+  <h2>Lease Comparables Explorer</h2>
+
+  <div class="filters card">
+    <div class="filter-group">
+      <label>Region</label>
+      <select [(ngModel)]="regionFilter" (ngModelChange)="onFilterChange()">
+        <option value="">All Regions</option>
+        <option *ngFor="let r of regions" [value]="r">{{ formatLabel(r) }}</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Tower Type</label>
+      <select [(ngModel)]="towerTypeFilter" (ngModelChange)="onFilterChange()">
+        <option value="">All Types</option>
+        <option *ngFor="let t of towerTypes" [value]="t">{{ formatLabel(t) }}</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Provider</label>
+      <select [(ngModel)]="providerFilter" (ngModelChange)="onFilterChange()">
+        <option value="">All Providers</option>
+        <option *ngFor="let p of providers" [value]="p">{{ formatLabel(p) }}</option>
+      </select>
+    </div>
+    <div class="filter-count">
+      Showing {{ filteredComparables.length }} of {{ allComparables.length }} comparables
+    </div>
+  </div>
+
+  <div class="card chart-card">
+    <canvas #scatterCanvas></canvas>
+  </div>
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Comp ID</th>
+            <th>Address</th>
+            <th>Distance</th>
+            <th>Monthly Rate</th>
+            <th>Tower Type</th>
+            <th>Lease Date</th>
+            <th>Escalation</th>
+            <th>Provider</th>
+            <th>Term (yrs)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let comp of filteredComparables">
+            <td class="comp-id">{{ comp.comp_id }}</td>
+            <td>{{ comp.address }}</td>
+            <td>{{ comp.distance_miles }} mi</td>
+            <td class="rate">{{ formatCurrency(comp.monthly_rate) }}</td>
+            <td>{{ formatLabel(comp.tower_type) }}</td>
+            <td>{{ comp.lease_date }}</td>
+            <td>{{ comp.escalation_terms }}</td>
+            <td>{{ formatLabel(comp.provider) }}</td>
+            <td>{{ comp.lease_term_years }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

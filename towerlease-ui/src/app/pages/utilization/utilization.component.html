@@ -1,0 +1,57 @@
+<div class="utilization-page">
+  <h2>Tower Utilization &amp; Tenant View</h2>
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Tower</th>
+            <th>Provider</th>
+            <th>Occupancy</th>
+            <th class="chart-col">Slots</th>
+            <th>Bandwidth</th>
+            <th>Structural Cap.</th>
+            <th>Leverage</th>
+            <th>Last Inspection</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let tower of towers; let i = index">
+            <td>
+              <div class="tower-name">{{ tower.nickname }}</div>
+              <div class="tower-id">{{ tower.tower_id }}</div>
+            </td>
+            <td>{{ formatProvider(tower.provider) }}</td>
+            <td>{{ tower.occupied_slots }}/{{ tower.total_tenant_slots }}</td>
+            <td class="chart-col">
+              <canvas [id]="'donut-' + i" width="50" height="50"></canvas>
+            </td>
+            <td>
+              <div class="progress-bar-wrapper">
+                <div class="progress-bar" [style.width.%]="tower.bandwidth_utilization_pct"
+                     [class.high]="tower.bandwidth_utilization_pct >= 80"
+                     [class.medium]="tower.bandwidth_utilization_pct >= 60 && tower.bandwidth_utilization_pct < 80">
+                </div>
+              </div>
+              <span class="pct-label">{{ tower.bandwidth_utilization_pct }}%</span>
+            </td>
+            <td>
+              <div class="progress-bar-wrapper">
+                <div class="progress-bar remaining" [style.width.%]="tower.structural_capacity_remaining_pct"></div>
+              </div>
+              <span class="pct-label">{{ tower.structural_capacity_remaining_pct }}%</span>
+            </td>
+            <td>
+              <span class="badge" [ngClass]="getLeverageBadgeClass(tower.occupied_slots)">
+                {{ getLeverageScore(tower.occupied_slots) }}
+              </span>
+              <div class="leverage-note">{{ getLeverageNote(tower.occupied_slots) }}</div>
+            </td>
+            <td>{{ tower.last_structural_inspection }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

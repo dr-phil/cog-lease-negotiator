@@ -1,0 +1,46 @@
+<div class="map-page">
+  <h2>Tower Portfolio Map View</h2>
+
+  <div class="legend">
+    <span class="legend-item"><span class="dot green"></span> &lt; $5,000/mo</span>
+    <span class="legend-item"><span class="dot yellow"></span> $5,000 – $12,000/mo</span>
+    <span class="legend-item"><span class="dot red"></span> &gt; $12,000/mo</span>
+  </div>
+
+  <div class="map-wrapper">
+    <div #mapContainer class="map-container"></div>
+
+    <div class="sidebar" *ngIf="selectedTower">
+      <div class="sidebar-header">
+        <h3>{{ selectedTower.nickname }}</h3>
+        <button class="close-btn" (click)="closeSidebar()">&times;</button>
+      </div>
+      <div class="sidebar-body">
+        <div class="detail-row">
+          <span class="label">Tower ID</span>
+          <span class="value">{{ selectedTower.tower_id }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Provider</span>
+          <span class="value">{{ formatProvider(selectedTower.provider) }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Region</span>
+          <span class="value">{{ selectedTower.region | titlecase }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Tower Type</span>
+          <span class="value">{{ formatType(selectedTower.tower_type) }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Monthly Rate</span>
+          <span class="value rate">{{ formatCurrency(selectedTower.current_monthly_rate) }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Lease Expiry</span>
+          <span class="value">{{ selectedTower.lease_expiry }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

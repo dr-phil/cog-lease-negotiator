@@ -1,0 +1,101 @@
+.utilization-page {
+  h2 { margin-bottom: 16px; }
+}
+
+.table-responsive {
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 900px;
+
+  th, td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid #eee;
+    vertical-align: middle;
+  }
+
+  th {
+    background: #f5f5f5;
+    font-weight: 600;
+    font-size: 13px;
+    color: #555;
+    white-space: nowrap;
+  }
+
+  .chart-col {
+    width: 60px;
+    text-align: center;
+  }
+}
+
+.tower-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.tower-id {
+  font-size: 12px;
+  color: #888;
+}
+
+.progress-bar-wrapper {
+  width: 80px;
+  height: 8px;
+  background: #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.progress-bar {
+  height: 100%;
+  background: #43a047;
+  border-radius: 4px;
+  transition: width 0.3s;
+
+  &.medium { background: #ffa726; }
+  &.high { background: #e53935; }
+  &.remaining { background: #42a5f5; }
+}
+
+.pct-label {
+  font-size: 12px;
+  color: #666;
+  margin-left: 6px;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.badge-high {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.badge-moderate {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.badge-low {
+  background: #fce4ec;
+  color: #c62828;
+}
+
+.leverage-note {
+  font-size: 11px;
+  color: #888;
+  margin-top: 4px;
+  max-width: 200px;
+}
