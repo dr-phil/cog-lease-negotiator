@@ -1,0 +1,73 @@
+<div class="tower-detail-page">
+  <div *ngIf="error" class="error-banner">{{ error }}</div>
+  <div *ngIf="loading" class="loading-spinner">Loading tower details...</div>
+
+  <ng-container *ngIf="!loading && tower">
+    <div class="page-header">
+      <button class="btn btn-secondary" (click)="goBack()">&larr; Back to Inventory</button>
+      <h2>{{ tower.nickname }}</h2>
+      <span class="tower-id-badge">{{ tower.tower_id }}</span>
+    </div>
+
+    <div class="detail-grid">
+      <!-- Tower Info Card -->
+      <div class="card info-card">
+        <h3>Tower Information</h3>
+        <div class="info-row">
+          <span class="info-label">Provider</span>
+          <span class="info-value">{{ formatProvider(tower.provider) }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Region</span>
+          <span class="info-value">{{ formatProvider(tower.region) }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Tower Type</span>
+          <span class="info-value">{{ formatProvider(tower.tower_type) }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Coordinates</span>
+          <span class="info-value">{{ tower.coordinates.lat }}, {{ tower.coordinates.lng }}</span>
+        </div>
+      </div>
+
+      <!-- Negotiation Form -->
+      <div class="card form-card">
+        <h3>Negotiate Lease</h3>
+        <form (ngSubmit)="onSubmit()">
+          <div class="form-group">
+            <label for="towerId">Tower ID</label>
+            <input id="towerId" type="text" [value]="tower.tower_id" readonly />
+          </div>
+          <div class="form-group">
+            <label for="provider">Provider</label>
+            <input id="provider" type="text" [value]="formatProvider(tower.provider)" readonly />
+          </div>
+          <div class="form-group">
+            <label for="region">Region</label>
+            <input id="region" type="text" [value]="formatProvider(tower.region)" readonly />
+          </div>
+          <div class="form-group">
+            <label for="monthlyRate">Current Monthly Rate ($)</label>
+            <input id="monthlyRate" type="number" [(ngModel)]="currentMonthlyRate"
+                   name="currentMonthlyRate" required min="0" />
+          </div>
+          <div class="form-group">
+            <label for="leaseExpiry">Lease Expiry</label>
+            <input id="leaseExpiry" type="date" [(ngModel)]="leaseExpiry"
+                   name="leaseExpiry" required />
+          </div>
+          <div class="form-group">
+            <label for="yearsRemaining">Lease Years Remaining</label>
+            <input id="yearsRemaining" type="number" [(ngModel)]="leaseYearsRemaining"
+                   name="leaseYearsRemaining" required min="0" step="0.1" />
+          </div>
+          <button type="submit" class="btn btn-primary btn-block" [disabled]="submitting">
+            <span *ngIf="!submitting">Generate Negotiation Brief</span>
+            <span *ngIf="submitting">Generating Brief...</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </ng-container>
+</div>

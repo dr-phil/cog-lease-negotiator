@@ -1,0 +1,136 @@
+.tower-list-page {
+  h2 {
+    margin-bottom: 16px;
+    color: #1976d2;
+  }
+}
+
+.filters {
+  .filter-row {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .filter-group {
+    flex: 1;
+    min-width: 180px;
+
+    label {
+      display: block;
+      font-weight: 500;
+      margin-bottom: 4px;
+      font-size: 12px;
+      text-transform: uppercase;
+      color: #777;
+    }
+
+    select {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 14px;
+      background: #fff;
+
+      &:focus {
+        outline: none;
+        border-color: #1976d2;
+        box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.2);
+      }
+    }
+  }
+
+  .result-count {
+    margin-top: 12px;
+    font-size: 13px;
+    color: #777;
+  }
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  padding: 0;
+}
+
+.tower-table {
+  width: 100%;
+  border-collapse: collapse;
+
+  th, td {
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+    white-space: nowrap;
+  }
+
+  th {
+    background: #fafafa;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    color: #555;
+    position: sticky;
+    top: 0;
+
+    &.sortable {
+      cursor: pointer;
+      user-select: none;
+
+      &:hover {
+        background: #f0f0f0;
+      }
+    }
+  }
+
+  .mono {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 13px;
+  }
+
+  .rate {
+    font-weight: 600;
+  }
+
+  tr.urgency-red {
+    td {
+      background-color: #ffebee;
+    }
+    &:hover td {
+      background-color: #ffcdd2;
+    }
+  }
+
+  tr.urgency-yellow {
+    td {
+      background-color: #fff8e1;
+    }
+    &:hover td {
+      background-color: #ffecb3;
+    }
+  }
+
+  tr.urgency-green {
+    td {
+      background-color: #e8f5e9;
+    }
+    &:hover td {
+      background-color: #c8e6c9;
+    }
+  }
+
+  tbody tr:hover td {
+    transition: background-color 0.15s;
+  }
+}
+
+.btn-sm {
+  padding: 4px 12px;
+  font-size: 13px;
+}
+
+.no-results {
+  padding: 24px;
+  text-align: center;
+  color: #999;
+}

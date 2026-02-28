@@ -1,0 +1,90 @@
+<div class="tower-list-page">
+  <h2>Tower Inventory</h2>
+
+  <div *ngIf="error" class="error-banner">{{ error }}</div>
+
+  <div *ngIf="loading" class="loading-spinner">Loading tower inventory...</div>
+
+  <ng-container *ngIf="!loading && !error">
+    <!-- Filters -->
+    <div class="filters card">
+      <div class="filter-row">
+        <div class="filter-group">
+          <label for="providerFilter">Provider</label>
+          <select id="providerFilter" [(ngModel)]="providerFilter" (ngModelChange)="applyFilters()">
+            <option value="">All Providers</option>
+            <option *ngFor="let p of providers" [value]="p">{{ formatProvider(p) }}</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="regionFilter">Region</label>
+          <select id="regionFilter" [(ngModel)]="regionFilter" (ngModelChange)="applyFilters()">
+            <option value="">All Regions</option>
+            <option *ngFor="let r of regions" [value]="r">{{ formatProvider(r) }}</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="towerTypeFilter">Tower Type</label>
+          <select id="towerTypeFilter" [(ngModel)]="towerTypeFilter" (ngModelChange)="applyFilters()">
+            <option value="">All Types</option>
+            <option *ngFor="let t of towerTypes" [value]="t">{{ formatProvider(t) }}</option>
+          </select>
+        </div>
+      </div>
+      <div class="result-count">
+        Showing {{ filteredTowers.length }} of {{ towers.length }} towers
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrapper card">
+      <table class="tower-table">
+        <thead>
+          <tr>
+            <th (click)="sortBy('nickname')" class="sortable">
+              Nickname{{ getSortIcon('nickname') }}
+            </th>
+            <th (click)="sortBy('tower_id')" class="sortable">
+              Tower ID{{ getSortIcon('tower_id') }}
+            </th>
+            <th (click)="sortBy('provider')" class="sortable">
+              Provider{{ getSortIcon('provider') }}
+            </th>
+            <th (click)="sortBy('region')" class="sortable">
+              Region{{ getSortIcon('region') }}
+            </th>
+            <th (click)="sortBy('tower_type')" class="sortable">
+              Type{{ getSortIcon('tower_type') }}
+            </th>
+            <th (click)="sortBy('current_monthly_rate')" class="sortable">
+              Monthly Rate{{ getSortIcon('current_monthly_rate') }}
+            </th>
+            <th (click)="sortBy('lease_expiry')" class="sortable">
+              Lease Expiry{{ getSortIcon('lease_expiry') }}
+            </th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let tower of filteredTowers" [ngClass]="getRowClass(tower)">
+            <td>{{ tower.nickname }}</td>
+            <td class="mono">{{ tower.tower_id }}</td>
+            <td>{{ formatProvider(tower.provider) }}</td>
+            <td>{{ formatProvider(tower.region) }}</td>
+            <td>{{ formatProvider(tower.tower_type) }}</td>
+            <td class="rate">{{ formatRate(tower.current_monthly_rate) }}</td>
+            <td>{{ tower.lease_expiry }}</td>
+            <td>
+              <button class="btn btn-primary btn-sm" (click)="onNegotiate(tower)">
+                Negotiate
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div *ngIf="filteredTowers.length === 0" class="no-results">
+        No towers match the current filters.
+      </div>
+    </div>
+  </ng-container>
+</div>
