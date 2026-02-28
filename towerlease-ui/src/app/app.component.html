@@ -1,0 +1,12 @@
+<header class="app-header">
+  <div class="header-content">
+    <h1 class="app-title" routerLink="/towers">TowerLease Intelligence</h1>
+    <nav class="app-nav">
+      <a routerLink="/towers" routerLinkActive="active"
+         [routerLinkActiveOptions]="{ exact: true }">Tower Inventory</a>
+    </nav>
+  </div>
+</header>
+<main class="app-main">
+  <router-outlet></router-outlet>
+</main>

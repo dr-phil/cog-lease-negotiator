@@ -1,0 +1,157 @@
+.brief-page {
+  h2 {
+    color: #1976d2;
+    margin: 0;
+  }
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+
+  .session-badge {
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    font-size: 12px;
+    background: #f5f5f5;
+    color: #777;
+    padding: 4px 10px;
+    border-radius: 4px;
+  }
+}
+
+.brief-section {
+  .brief-text {
+    line-height: 1.7;
+    color: #444;
+    white-space: pre-line;
+  }
+}
+
+.rate-card-section {
+  .rate-table {
+    width: 100%;
+    border-collapse: collapse;
+
+    th, td {
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid #eee;
+    }
+
+    th {
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      color: #555;
+      background: #fafafa;
+    }
+
+    .rate-value {
+      font-weight: 600;
+      font-size: 15px;
+      white-space: nowrap;
+    }
+  }
+}
+
+.bar-container {
+  width: 100%;
+  height: 20px;
+  background: #f0f0f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.bar-opening {
+  background-color: #2e7d32;
+}
+
+.bar-walkaway {
+  background-color: #d32f2f;
+}
+
+.bar-comp-low {
+  background-color: #90caf9;
+}
+
+.bar-comp-median {
+  background-color: #42a5f5;
+}
+
+.bar-comp-high {
+  background-color: #1565c0;
+}
+
+.leverage-list {
+  margin: 0;
+  padding-left: 20px;
+
+  li {
+    padding: 6px 0;
+    line-height: 1.5;
+    color: #444;
+  }
+}
+
+.context-text {
+  line-height: 1.7;
+  color: #444;
+  white-space: pre-line;
+}
+
+.qa-section {
+  .qa-history {
+    margin-bottom: 16px;
+  }
+
+  .qa-pair {
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    background: #fafafa;
+  }
+
+  .qa-question {
+    color: #1976d2;
+    margin-bottom: 8px;
+    font-size: 14px;
+  }
+
+  .qa-answer {
+    color: #444;
+    line-height: 1.6;
+  }
+
+  .qa-input-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .qa-input {
+    flex: 1;
+    padding: 10px 14px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+
+    &:focus {
+      outline: none;
+      border-color: #1976d2;
+      box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.2);
+    }
+
+    &:disabled {
+      background-color: #f5f5f5;
+    }
+  }
+}

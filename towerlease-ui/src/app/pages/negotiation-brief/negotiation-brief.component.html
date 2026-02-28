@@ -1,0 +1,157 @@
+<div class="brief-page">
+  <div *ngIf="error" class="error-banner">
+    {{ error }}
+    <button *ngIf="sessionExpired" class="btn btn-primary" style="margin-left: 12px;" (click)="goToTowers()">
+      Generate New Brief
+    </button>
+  </div>
+
+  <div *ngIf="!brief && !error" class="loading-spinner">
+    No brief data available. <a routerLink="/towers">Return to Tower Inventory</a>
+  </div>
+
+  <ng-container *ngIf="brief">
+    <div class="page-header">
+      <button class="btn btn-secondary" (click)="goToTowers()">&larr; Back to Inventory</button>
+      <h2>Negotiation Brief</h2>
+      <span class="session-badge">Session: {{ sessionId }}</span>
+    </div>
+
+    <!-- Brief Section -->
+    <div class="card brief-section">
+      <h3>Brief</h3>
+      <p class="brief-text">{{ brief.brief }}</p>
+    </div>
+
+    <!-- Rate Card -->
+    <div class="card rate-card-section">
+      <h3>Rate Card</h3>
+      <table class="rate-table">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th>Amount</th>
+            <th>Visual</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Recommended Opening Rate</td>
+            <td class="rate-value">{{ formatRate(brief.recommended_opening_rate) }}</td>
+            <td>
+              <div class="bar-container">
+                <div class="bar bar-opening"
+                     [style.width.%]="getBarWidth(brief.recommended_opening_rate, getMaxRate())"></div>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>Walk-Away Rate</td>
+            <td class="rate-value">{{ formatRate(brief.walk_away_rate) }}</td>
+            <td>
+              <div class="bar-container">
+                <div class="bar bar-walkaway"
+                     [style.width.%]="getBarWidth(brief.walk_away_rate, getMaxRate())"></div>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>Comparable Low</td>
+            <td class="rate-value">{{ formatRate(brief.comparable_rates.low) }}</td>
+            <td>
+              <div class="bar-container">
+                <div class="bar bar-comp-low"
+                     [style.width.%]="getBarWidth(brief.comparable_rates.low, getMaxRate())"></div>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>Comparable Median</td>
+            <td class="rate-value">{{ formatRate(brief.comparable_rates.median) }}</td>
+            <td>
+              <div class="bar-container">
+                <div class="bar bar-comp-median"
+                     [style.width.%]="getBarWidth(brief.comparable_rates.median, getMaxRate())"></div>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>Comparable High</td>
+            <td class="rate-value">{{ formatRate(brief.comparable_rates.high) }}</td>
+            <td>
+              <div class="bar-container">
+                <div class="bar bar-comp-high"
+                     [style.width.%]="getBarWidth(brief.comparable_rates.high, getMaxRate())"></div>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Key Leverage Points -->
+    <div class="card">
+      <h3>Key Leverage Points</h3>
+      <ul class="leverage-list">
+        <li *ngFor="let point of brief.key_leverage_points">{{ point }}</li>
+      </ul>
+    </div>
+
+    <!-- Provider Context -->
+    <div class="card">
+      <h3>Provider Context</h3>
+      <p class="context-text">{{ brief.provider_context }}</p>
+    </div>
+
+    <!-- Region Context -->
+    <div class="card">
+      <h3>Region Context</h3>
+      <p class="context-text">{{ brief.region_context }}</p>
+    </div>
+
+    <!-- Negotiation History Summary -->
+    <div class="card">
+      <h3>Negotiation History Summary</h3>
+      <p class="context-text">{{ brief.negotiation_history_summary }}</p>
+    </div>
+
+    <!-- CRM Intelligence -->
+    <div class="card">
+      <h3>CRM Intelligence</h3>
+      <p class="context-text">{{ brief.crm_intelligence }}</p>
+    </div>
+
+    <!-- Follow-up Q&A -->
+    <div class="card qa-section">
+      <h3>Follow-up Q&amp;A</h3>
+
+      <!-- QA History -->
+      <div *ngIf="qaHistory.length > 0" class="qa-history">
+        <div *ngFor="let qa of qaHistory" class="qa-pair">
+          <div class="qa-question">
+            <strong>Q:</strong> {{ qa.question }}
+          </div>
+          <div class="qa-answer">
+            <strong>A:</strong> {{ qa.answer }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Ask Input -->
+      <div class="qa-input-row">
+        <input type="text"
+               [(ngModel)]="question"
+               placeholder="Ask a follow-up question..."
+               (keyup.enter)="askFollowup()"
+               [disabled]="askingFollowup || sessionExpired"
+               class="qa-input" />
+        <button class="btn btn-primary"
+                (click)="askFollowup()"
+                [disabled]="!question.trim() || askingFollowup || sessionExpired">
+          <span *ngIf="!askingFollowup">Ask</span>
+          <span *ngIf="askingFollowup">Asking...</span>
+        </button>
+      </div>
+    </div>
+  </ng-container>
+</div>
