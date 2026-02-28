@@ -33,6 +33,8 @@ class NegotiateResponse(BaseModel):
     comparable_rates: ComparableRates
     provider_context: str
     region_context: str
+    negotiation_history_summary: str
+    crm_intelligence: str
 
 
 class FollowupRequest(BaseModel):

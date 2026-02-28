@@ -55,4 +55,6 @@ def negotiate(request: NegotiateRequest):
         comparable_rates=brief_data["comparable_rates"],
         provider_context=brief_data["provider_context"],
         region_context=brief_data["region_context"],
+        negotiation_history_summary=brief_data["negotiation_history_summary"],
+        crm_intelligence=brief_data["crm_intelligence"],
     )
