@@ -37,7 +37,9 @@ The JSON must have exactly these fields:
     "high": <integer>
   },
   "provider_context": "Summary of provider-specific considerations",
-  "region_context": "Summary of regional market conditions"
+  "region_context": "Summary of regional market conditions",
+  "negotiation_history_summary": "Summary of historical lease negotiations for this tower from the LeaseTrack system. Note if data quality is low or sparse.",
+  "crm_intelligence": "Summary of CRM relationship intelligence for this provider from NegotiatorCRM. Note if data quality is low/sparse or if sparse_data_warning was flagged."
 }
 
 IMPORTANT: Return ONLY valid JSON, no markdown formatting or code blocks. The recommended_opening_rate should be below the current rate (we're trying to negotiate DOWN). The walk_away_rate should be at or slightly below the current rate."""
@@ -109,6 +111,8 @@ def _ensure_complete(brief_data, current_rate):
         }),
         "provider_context": brief_data.get("provider_context", "Provider context not available"),
         "region_context": brief_data.get("region_context", "Region context not available"),
+        "negotiation_history_summary": brief_data.get("negotiation_history_summary", "No lease history data available"),
+        "crm_intelligence": brief_data.get("crm_intelligence", "No CRM intelligence available"),
     }
     return defaults
 
@@ -130,4 +134,6 @@ def _build_fallback_brief(raw_analysis, current_rate):
         },
         "provider_context": "Parse error -- see raw brief text",
         "region_context": "Parse error -- see raw brief text",
+        "negotiation_history_summary": "Parse error -- see raw brief text",
+        "crm_intelligence": "Parse error -- see raw brief text",
     }

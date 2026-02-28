@@ -86,13 +86,13 @@ def mock_openai_with_tool_call():
     """Mock that simulates a tool call loop.
 
     Call sequence:
-    1. function_call to lease_comparables
-    2. function_call to property_lookup
-    3. function_call to tower_utilization
+    1. function_call to get_lease_history
+    2. function_call to get_negotiation_notes
+    3. function_call to lease_comparables
     4. stop with final analysis
     5. stop for brief generator formatting
 
-    This exercises the full agent loop including tool dispatch.
+    This exercises a realistic 3-tool-call sequence before the final completion.
     """
     mock_brief_json = json.dumps({
         "brief": "Comprehensive mock brief after tool calls.",
@@ -106,26 +106,28 @@ def mock_openai_with_tool_call():
         "comparable_rates": {"low": 2400, "median": 2900, "high": 3600},
         "provider_context": "Provider responds to data-driven arguments.",
         "region_context": "Regional rates trending down for this tower type.",
+        "negotiation_history_summary": "Historical rates show consistent 4-5% annual escalation. Last negotiated in 2022.",
+        "crm_intelligence": "SBA Communications is a preferred-tier provider. Account team restructured in Q4 2023.",
     })
 
     with patch("openai.ChatCompletion.create") as mock_create:
         mock_create.side_effect = [
-            # Call 1: agent wants to look up lease comparables
+            # Call 1: agent retrieves internal lease history first
+            _build_response("function_call", fn_name="get_lease_history", fn_args={
+                "tower_id": "ATT-FL-4205",
+            }),
+            # Call 2: agent retrieves CRM negotiation notes
+            _build_response("function_call", fn_name="get_negotiation_notes", fn_args={
+                "provider": "sba_communications",
+            }),
+            # Call 3: agent pulls market comparables
             _build_response("function_call", fn_name="lease_comparables", fn_args={
                 "region": "southeast",
                 "tower_type": "ground_mount",
             }),
-            # Call 2: agent wants property lookup
-            _build_response("function_call", fn_name="property_lookup", fn_args={
-                "tower_id": "ATT-FL-4205",
-            }),
-            # Call 3: agent wants tower utilization
-            _build_response("function_call", fn_name="tower_utilization", fn_args={
-                "tower_id": "ATT-FL-4205",
-            }),
             # Call 4: agent returns final analysis
             _build_response("stop", content=(
-                "Based on comparable analysis, property records, and utilization data, "
+                "Based on internal lease history, CRM intelligence, and comparable analysis, "
                 "the current rate of $3200/mo is above the regional median of $2800. "
                 "AT&T has strong leverage due to multi-tenant occupancy."
             )),

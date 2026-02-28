@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 
 from towerlease.server.main import app
 from towerlease.server import session_store
+from towerlease.server.schemas import NegotiateResponse
 
 
 client = TestClient(app)
@@ -80,6 +81,8 @@ class TestNegotiateEndpoint:
             "comparable_rates": {"low": 2600, "median": 3000, "high": 3800},
             "provider_context": "Provider context here.",
             "region_context": "Region context here.",
+            "negotiation_history_summary": "Historical rates show 4% annual escalation.",
+            "crm_intelligence": "Provider has strategic relationship tier with AT&T.",
         })
 
         with patch("openai.ChatCompletion.create") as mock_create:
@@ -121,6 +124,8 @@ class TestNegotiateEndpoint:
         assert "comparable_rates" in data
         assert "provider_context" in data
         assert "region_context" in data
+        assert "negotiation_history_summary" in data
+        assert "crm_intelligence" in data
 
         # Verify types
         assert isinstance(data["session_id"], str)
@@ -197,6 +202,32 @@ class TestFollowupEndpoint:
         # Session should now have more messages
         updated = session_store.get_messages(session_id)
         assert len(updated) > len(messages)
+
+
+class TestNegotiateResponseSchema:
+    """Verify that NegotiateResponse includes the new fields."""
+
+    def test_negotiate_response_has_negotiation_history_summary(self):
+        """Test that NegotiateResponse includes negotiation_history_summary field."""
+        fields = NegotiateResponse.__fields__
+        assert "negotiation_history_summary" in fields
+        assert fields["negotiation_history_summary"].outer_type_ is str
+
+    def test_negotiate_response_has_crm_intelligence(self):
+        """Test that NegotiateResponse includes crm_intelligence field."""
+        fields = NegotiateResponse.__fields__
+        assert "crm_intelligence" in fields
+        assert fields["crm_intelligence"].outer_type_ is str
+
+    def test_negotiate_response_full_shape(self):
+        """Test that NegotiateResponse has all expected fields."""
+        expected_fields = {
+            "session_id", "brief", "recommended_opening_rate", "walk_away_rate",
+            "key_leverage_points", "comparable_rates", "provider_context",
+            "region_context", "negotiation_history_summary", "crm_intelligence",
+        }
+        actual_fields = set(NegotiateResponse.__fields__.keys())
+        assert expected_fields == actual_fields
 
 
 class TestHealthCheck:

@@ -20,6 +20,8 @@ from towerlease.agents.negotiation_agent import (
 from towerlease.agents.brief_generator import generate_brief
 from towerlease.agents.followup_agent import handle_followup
 from towerlease.server import session_store
+from towerlease.services.lease_history_service import get_lease_history
+from towerlease.services.negotiation_notes_service import get_negotiation_notes
 
 
 # -- Tool dispatch tests --
@@ -63,6 +65,21 @@ class TestToolDispatch:
     def test_bad_args_returns_error(self):
         result = dispatch_tool("property_lookup", {"bad_arg": "value"})
         assert "error" in result
+
+    def test_get_lease_history_dispatch(self):
+        result = dispatch_tool("get_lease_history", {"tower_id": "ATT-TX-4821"})
+        assert "tower_id" in result
+        assert result["tower_id"] == "ATT-TX-4821"
+        assert "lease_history" in result
+        assert "rate_trend" in result
+        assert "data_quality" in result
+
+    def test_get_negotiation_notes_dispatch(self):
+        result = dispatch_tool("get_negotiation_notes", {"provider": "crown_castle"})
+        assert "provider" in result
+        assert result["provider"] == "crown_castle"
+        assert "negotiation_notes" in result
+        assert "crm_data_quality" in result
 
 
 # -- System prompt and message building tests --
@@ -136,6 +153,12 @@ class TestNegotiationAgent:
         # Verify tool call messages are in the history
         fn_messages = [m for m in messages if m.get("role") == "function"]
         assert len(fn_messages) == 3
+
+        # Verify the new tools are called first in the sequence
+        fn_names = [m["name"] for m in messages if m.get("role") == "function"]
+        assert fn_names[0] == "get_lease_history"
+        assert fn_names[1] == "get_negotiation_notes"
+        assert fn_names[2] == "lease_comparables"
 
 
 class TestNegotiationPerProvider:
@@ -244,6 +267,53 @@ class TestBriefGenerator:
         # Should fall back to default structure
         assert "brief" in brief
         assert isinstance(brief["recommended_opening_rate"], int)
+
+
+class TestSparseDataPath:
+    """Test the sparse data path when CRM data is limited."""
+
+    def test_sparse_negotiation_notes_flagged_in_brief(self):
+        """Test that sparse_data_warning: true results in explicit acknowledgment in brief."""
+        # Municipal provider returns sparse CRM data
+        notes = get_negotiation_notes("municipal")
+        assert notes["sparse_data_warning"] is True
+        assert notes["crm_data_quality"] == "low"
+        assert notes["negotiation_notes"] == []
+
+        # Rural individual also returns sparse data
+        notes_rural = get_negotiation_notes("rural_individual")
+        assert notes_rural["sparse_data_warning"] is True
+        assert notes_rural["crm_data_quality"] == "low"
+
+        # Now test the full brief generation path with sparse data
+        with patch("openai.ChatCompletion.create") as mock_create:
+            mock_brief_json = json.dumps({
+                "brief": "Brief for municipal tower.",
+                "recommended_opening_rate": 2000,
+                "walk_away_rate": 2300,
+                "key_leverage_points": ["Limited CRM data available"],
+                "comparable_rates": {"low": 1800, "median": 2200, "high": 2800},
+                "provider_context": "Municipal provider with limited relationship data.",
+                "region_context": "Midwest region context.",
+                "negotiation_history_summary": "Limited lease history data available (data quality: low).",
+                "crm_intelligence": "Limited CRM data available. sparse_data_warning flagged -- CRM records are incomplete for this provider.",
+            })
+            mock_create.return_value = {
+                "choices": [{
+                    "message": {
+                        "role": "assistant",
+                        "content": mock_brief_json,
+                    },
+                    "finish_reason": "stop",
+                }]
+            }
+            brief = generate_brief(
+                "Raw analysis with sparse CRM data.",
+                {"current_monthly_rate": 2400},
+            )
+
+        assert "crm_intelligence" in brief
+        assert "limited" in brief["crm_intelligence"].lower() or "sparse" in brief["crm_intelligence"].lower()
 
 
 # -- Follow-up agent tests --

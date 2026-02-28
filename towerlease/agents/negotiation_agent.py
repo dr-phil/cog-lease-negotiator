@@ -23,6 +23,8 @@ from towerlease.tools import property_lookup
 from towerlease.tools import lease_comparables
 from towerlease.tools import tower_utilization
 from towerlease.tools import regulatory_lookup
+from towerlease.services import lease_history_service
+from towerlease.services import negotiation_notes_service
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
@@ -32,6 +34,8 @@ TOOL_DEFINITIONS = [
     lease_comparables.TOOL_DEFINITION,
     tower_utilization.TOOL_DEFINITION,
     regulatory_lookup.TOOL_DEFINITION,
+    lease_history_service.TOOL_DEFINITION,
+    negotiation_notes_service.TOOL_DEFINITION,
 ]
 
 # Map function names to their implementation
@@ -40,6 +44,8 @@ _TOOL_DISPATCH = {
     "lease_comparables": lease_comparables.lookup,
     "tower_utilization": tower_utilization.lookup,
     "regulatory_lookup": regulatory_lookup.lookup,
+    "get_lease_history": lease_history_service.get_lease_history,
+    "get_negotiation_notes": negotiation_notes_service.get_negotiation_notes,
 }
 
 
@@ -90,13 +96,23 @@ def build_system_prompt(provider, region):
 
     system_prompt += (
         "\n\nINSTRUCTIONS:\n"
-        "1. First, look up the property record for this tower site.\n"
-        "2. Then, pull comparable lease rates for this region and tower type.\n"
-        "3. Check tower utilization data to assess leverage position.\n"
-        "4. If the provider is municipal or the region has complex permitting, "
+        "1. First, call get_lease_history to retrieve AT&T's internal negotiation "
+        "history for this tower. This gives you historical context on past rates, "
+        "escalation patterns, and negotiator notes.\n"
+        "2. Call get_negotiation_notes to pull relationship intelligence from the "
+        "CRM for this provider. Understand known sticking points and committed "
+        "positions before analyzing external data.\n"
+        "3. Look up the property record for this tower site.\n"
+        "4. Then, pull comparable lease rates for this region and tower type. Use "
+        "the internal history from steps 1-2 to contextualize the market data.\n"
+        "5. Check tower utilization data to assess leverage position.\n"
+        "6. If the provider is municipal or the region has complex permitting, "
         "also check regulatory context.\n"
-        "5. Synthesize all gathered data into a comprehensive negotiation brief.\n"
-        "6. Include specific rate recommendations with supporting evidence.\n"
+        "7. Synthesize all gathered data into a comprehensive negotiation brief.\n"
+        "8. Include specific rate recommendations with supporting evidence.\n"
+        "Always call get_lease_history and get_negotiation_notes before the market "
+        "comparables tools. Internal history should inform how you interpret "
+        "external market data.\n"
         "Always make your tool calls before providing your final analysis."
     )
 
