@@ -1,0 +1,183 @@
+"""
+Tower inventory endpoint.
+
+GET /api/towers -- returns mock inventory of 15 towers spread across
+all five providers and four regions.
+
+No OpenAI dependency here -- pure static mock data.
+"""
+from fastapi import APIRouter
+
+router = APIRouter()
+
+# Static tower inventory -- 15 towers across providers and regions
+# These are fake but realistic AT&T tower identifiers
+TOWER_INVENTORY = [
+    # Crown Castle towers
+    {
+        "tower_id": "ATT-NY-1201",
+        "nickname": "Midtown East Rooftop",
+        "provider": "crown_castle",
+        "region": "northeast",
+        "tower_type": "rooftop",
+        "current_monthly_rate": 18500,
+        "lease_expiry": "2025-11-01",
+        "coordinates": {"lat": 40.7549, "lng": -73.9724},
+    },
+    {
+        "tower_id": "ATT-GA-3302",
+        "nickname": "Peachtree Industrial",
+        "provider": "crown_castle",
+        "region": "southeast",
+        "tower_type": "monopole",
+        "current_monthly_rate": 3400,
+        "lease_expiry": "2026-03-15",
+        "coordinates": {"lat": 33.9272, "lng": -84.3385},
+    },
+    {
+        "tower_id": "ATT-CA-7701",
+        "nickname": "Bay Area Ground Site",
+        "provider": "crown_castle",
+        "region": "west",
+        "tower_type": "ground_mount",
+        "current_monthly_rate": 4200,
+        "lease_expiry": "2025-08-01",
+        "coordinates": {"lat": 37.5585, "lng": -122.2711},
+    },
+    # American Tower towers
+    {
+        "tower_id": "ATT-MA-1502",
+        "nickname": "Boston Harbor Rooftop",
+        "provider": "american_tower",
+        "region": "northeast",
+        "tower_type": "rooftop",
+        "current_monthly_rate": 16200,
+        "lease_expiry": "2025-12-01",
+        "coordinates": {"lat": 42.3601, "lng": -71.0589},
+    },
+    {
+        "tower_id": "ATT-FL-4101",
+        "nickname": "Orlando East Monopole",
+        "provider": "american_tower",
+        "region": "southeast",
+        "tower_type": "monopole",
+        "current_monthly_rate": 3800,
+        "lease_expiry": "2026-06-01",
+        "coordinates": {"lat": 28.5383, "lng": -81.3792},
+    },
+    {
+        "tower_id": "ATT-IL-5501",
+        "nickname": "Chicago West Loop",
+        "provider": "american_tower",
+        "region": "midwest",
+        "tower_type": "rooftop",
+        "current_monthly_rate": 11500,
+        "lease_expiry": "2025-09-15",
+        "coordinates": {"lat": 41.8827, "lng": -87.6474},
+    },
+    # SBA Communications towers
+    {
+        "tower_id": "ATT-FL-4205",
+        "nickname": "Tampa Bay Ground Mount",
+        "provider": "sba_communications",
+        "region": "southeast",
+        "tower_type": "ground_mount",
+        "current_monthly_rate": 3200,
+        "lease_expiry": "2025-07-01",
+        "coordinates": {"lat": 27.9506, "lng": -82.4572},
+    },
+    {
+        "tower_id": "ATT-OH-6001",
+        "nickname": "Columbus Westside",
+        "provider": "sba_communications",
+        "region": "midwest",
+        "tower_type": "monopole",
+        "current_monthly_rate": 2800,
+        "lease_expiry": "2026-01-15",
+        "coordinates": {"lat": 39.9612, "lng": -82.9988},
+    },
+    {
+        "tower_id": "ATT-AZ-8101",
+        "nickname": "Phoenix North Monopole",
+        "provider": "sba_communications",
+        "region": "west",
+        "tower_type": "monopole",
+        "current_monthly_rate": 3600,
+        "lease_expiry": "2025-10-01",
+        "coordinates": {"lat": 33.5722, "lng": -112.0891},
+    },
+    # Municipal towers
+    {
+        "tower_id": "ATT-IN-5801",
+        "nickname": "Carmel Water Tower",
+        "provider": "municipal",
+        "region": "midwest",
+        "tower_type": "water_tower",
+        "current_monthly_rate": 2400,
+        "lease_expiry": "2026-02-01",
+        "coordinates": {"lat": 39.9784, "lng": -86.1180},
+    },
+    {
+        "tower_id": "ATT-NC-3501",
+        "nickname": "Durham Municipal Tower",
+        "provider": "municipal",
+        "region": "southeast",
+        "tower_type": "water_tower",
+        "current_monthly_rate": 3100,
+        "lease_expiry": "2025-06-15",
+        "coordinates": {"lat": 35.9940, "lng": -78.8986},
+    },
+    {
+        "tower_id": "ATT-CT-1301",
+        "nickname": "Hartford City Rooftop",
+        "provider": "municipal",
+        "region": "northeast",
+        "tower_type": "rooftop",
+        "current_monthly_rate": 9800,
+        "lease_expiry": "2026-04-01",
+        "coordinates": {"lat": 41.7658, "lng": -72.6734},
+    },
+    # Rural individual towers
+    {
+        "tower_id": "ATT-IA-5901",
+        "nickname": "Cedar Rapids Farm Site",
+        "provider": "rural_individual",
+        "region": "midwest",
+        "tower_type": "ground_mount",
+        "current_monthly_rate": 1500,
+        "lease_expiry": "2025-05-01",
+        "coordinates": {"lat": 41.9779, "lng": -91.6656},
+    },
+    {
+        "tower_id": "ATT-MT-8501",
+        "nickname": "Billings Ranch Ground",
+        "provider": "rural_individual",
+        "region": "west",
+        "tower_type": "ground_mount",
+        "current_monthly_rate": 1800,
+        "lease_expiry": "2026-08-01",
+        "coordinates": {"lat": 45.7833, "lng": -108.5007},
+    },
+    {
+        "tower_id": "ATT-AL-3701",
+        "nickname": "Huntsville Rural Site",
+        "provider": "rural_individual",
+        "region": "southeast",
+        "tower_type": "ground_mount",
+        "current_monthly_rate": 1600,
+        "lease_expiry": "2025-09-01",
+        "coordinates": {"lat": 34.7304, "lng": -86.5861},
+    },
+]
+
+
+@router.get("/api/towers")
+def list_towers():
+    """Return the full tower inventory.
+
+    No auth required -- this is internal-only behind the VPN.
+    """
+    return {
+        "towers": TOWER_INVENTORY,
+        "count": len(TOWER_INVENTORY),
+    }
