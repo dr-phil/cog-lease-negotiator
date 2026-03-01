@@ -13,11 +13,10 @@ a negotiation brief. Typical flow:
 Originally written by dkim@ in 2023-Q1, refactored by jcrawford@ in 2023-Q3
 to add the provider/region system prompt injection.
 """
-import os
 import json
 import importlib
 
-import openai
+from openai import OpenAI
 
 from towerlease.tools import property_lookup
 from towerlease.tools import lease_comparables
@@ -26,16 +25,25 @@ from towerlease.tools import regulatory_lookup
 from towerlease.services import lease_history_service
 from towerlease.services import negotiation_notes_service
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# Lazy-initialized client; created on first use so that tests can patch
+# the module-level `client` attribute before any real calls are made.
+client = None
 
-# Tool definitions in the old functions format
+
+def _get_client():
+    global client
+    if client is None:
+        client = OpenAI()
+    return client
+
+# Tool definitions wrapped for the Responses API tools format
 TOOL_DEFINITIONS = [
-    property_lookup.TOOL_DEFINITION,
-    lease_comparables.TOOL_DEFINITION,
-    tower_utilization.TOOL_DEFINITION,
-    regulatory_lookup.TOOL_DEFINITION,
-    lease_history_service.TOOL_DEFINITION,
-    negotiation_notes_service.TOOL_DEFINITION,
+    {"type": "function", "function": property_lookup.TOOL_DEFINITION},
+    {"type": "function", "function": lease_comparables.TOOL_DEFINITION},
+    {"type": "function", "function": tower_utilization.TOOL_DEFINITION},
+    {"type": "function", "function": regulatory_lookup.TOOL_DEFINITION},
+    {"type": "function", "function": lease_history_service.TOOL_DEFINITION},
+    {"type": "function", "function": negotiation_notes_service.TOOL_DEFINITION},
 ]
 
 # Map function names to their implementation
@@ -149,14 +157,18 @@ def run_negotiation_agent(tower_id, lease_data, provider, region):
         region: region identifier string
 
     Returns:
-        tuple of (final_response_text, messages_list)
+        tuple of (final_response_text, response_id)
     """
     system_prompt = build_system_prompt(provider, region)
 
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": build_initial_message(tower_id, lease_data, provider, region)},
-    ]
+    # Seed the conversation with the Responses API
+    response = _get_client().responses.create(
+        model="gpt-4",
+        instructions=system_prompt,
+        input=build_initial_message(tower_id, lease_data, provider, region),
+        tools=TOOL_DEFINITIONS,
+        store=True,
+    )
 
     # Agent loop -- keep calling until we get a stop response
     max_iterations = 10  # safety valve, shouldn't need more than 5-6
@@ -165,35 +177,27 @@ def run_negotiation_agent(tower_id, lease_data, provider, region):
     while iteration < max_iterations:
         iteration += 1
 
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=messages,
-            functions=TOOL_DEFINITIONS,
-            function_call="auto",
-        )
+        tool_calls = [item for item in response.output if item.type == "function_call"]
+        if not tool_calls:
+            return response.output_text, response.id
 
-        message = response["choices"][0]["message"]
-        finish_reason = response["choices"][0]["finish_reason"]
-
-        if finish_reason == "function_call":
-            fn_name = message["function_call"]["name"]
-            fn_args = json.loads(message["function_call"]["arguments"])
-
-            result = dispatch_tool(fn_name, fn_args)
-
-            # Append the assistant message with the function call
-            messages.append(message)
-            # Append the function result
-            messages.append({
-                "role": "function",
-                "name": fn_name,
-                "content": json.dumps(result),
+        tool_outputs = []
+        for tc in tool_calls:
+            result = dispatch_tool(tc.name, json.loads(tc.arguments))
+            tool_outputs.append({
+                "type": "function_call_output",
+                "call_id": tc.call_id,
+                "output": json.dumps(result),
             })
 
-        elif finish_reason == "stop":
-            messages.append(message)
-            return message["content"], messages
+        response = _get_client().responses.create(
+            model="gpt-4",
+            previous_response_id=response.id,
+            input=tool_outputs,
+            tools=TOOL_DEFINITIONS,
+            store=True,
+        )
 
     # If we hit max iterations, return whatever we have
     # This shouldn't happen in practice but better than infinite loop
-    return messages[-1].get("content", "Agent loop exceeded maximum iterations"), messages
+    return response.output_text, response.id

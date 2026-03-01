@@ -1,10 +1,13 @@
 """
 Test fixtures for TowerLease Intelligence.
 
-Mocks openai.ChatCompletion.create to avoid hitting the real API in tests.
-Two fixtures:
-  - mock_openai_single_turn: returns a stop response directly
-  - mock_openai_with_tool_call: simulates a tool call loop (function_call then stop)
+Mocks the OpenAI Responses API (client.responses.create) for the negotiation
+agent, and openai.ChatCompletion.create for the brief generator and follow-up
+agent (which have not yet been migrated).
+
+Two negotiation agent fixtures:
+  - mock_openai_single_turn: returns a stop response directly (no tool calls)
+  - mock_openai_with_tool_call: simulates a tool call loop then stop
 """
 import json
 import pytest
@@ -21,41 +24,46 @@ def clear_sessions():
     session_store.clear_all()
 
 
-def _make_stop_response(content="This is a mock negotiation analysis."):
-    """Build a mock ChatCompletion response with finish_reason: stop."""
-    response = MagicMock()
-    message = {
-        "role": "assistant",
-        "content": content,
-    }
-    response.__getitem__ = lambda self, key: {
-        "choices": [{"message": message, "finish_reason": "stop"}],
-    }[key]
-    return response
+def _make_function_call_item(fn_name, fn_args, call_id):
+    """Build a mock output item of type 'function_call'."""
+    item = MagicMock()
+    item.type = "function_call"
+    item.name = fn_name
+    item.arguments = json.dumps(fn_args) if isinstance(fn_args, dict) else fn_args
+    item.call_id = call_id
+    return item
 
 
-def _make_function_call_response(fn_name, fn_args):
-    """Build a mock ChatCompletion response with finish_reason: function_call."""
+def _make_text_output_item(text):
+    """Build a mock output item of type 'message' (not function_call)."""
+    item = MagicMock()
+    item.type = "message"
+    item.content = text
+    return item
+
+
+def _make_responses_api_response(output_items, output_text=None, response_id=None):
+    """Build a mock Responses API response object.
+
+    Args:
+        output_items: list of mock output items (function_call or message)
+        output_text: the .output_text string (for stop/text responses)
+        response_id: the .id string for this response
+    """
     response = MagicMock()
-    message = {
-        "role": "assistant",
-        "content": None,
-        "function_call": {
-            "name": fn_name,
-            "arguments": json.dumps(fn_args),
-        },
-    }
-    response.__getitem__ = lambda self, key: {
-        "choices": [{"message": message, "finish_reason": "function_call"}],
-    }[key]
+    response.output = output_items
+    response.output_text = output_text or ""
+    response.id = response_id or "resp_mock_default"
     return response
 
 
 @pytest.fixture
 def mock_openai_single_turn():
-    """Mock that returns a stop response on the first call.
+    """Mock that returns a stop response on the first call (no tool calls).
 
-    Used for brief generator and follow-up agent tests.
+    Used for negotiation agent tests where the agent completes in one turn.
+    The brief generator still uses the old ChatCompletion API so it gets
+    its own separate patch.
     """
     mock_brief_json = json.dumps({
         "brief": "Mock negotiation brief for testing.",
@@ -71,28 +79,36 @@ def mock_openai_single_turn():
         "region_context": "Mock region context for testing.",
     })
 
-    with patch("openai.ChatCompletion.create") as mock_create:
-        # First call: negotiation agent (single turn -- no tool calls)
-        # Second call: brief generator formatting
-        mock_create.side_effect = [
-            _build_response("stop", content="Raw analysis: rates are above market median."),
-            _build_response("stop", content=mock_brief_json),
-        ]
-        yield mock_create
+    # Mock the Responses API for the negotiation agent
+    agent_response = _make_responses_api_response(
+        output_items=[_make_text_output_item("Raw analysis: rates are above market median.")],
+        output_text="Raw analysis: rates are above market median.",
+        response_id="resp_single_turn_001",
+    )
+
+    mock_client = MagicMock()
+    mock_client.responses.create.return_value = agent_response
+
+    with patch("towerlease.agents.negotiation_agent._get_client", return_value=mock_client), \
+         patch("openai.ChatCompletion.create") as mock_chat:
+
+        # Brief generator still uses old API
+        mock_chat.return_value = _build_chat_response("stop", content=mock_brief_json)
+
+        yield mock_client, mock_chat
 
 
 @pytest.fixture
 def mock_openai_with_tool_call():
-    """Mock that simulates a tool call loop.
+    """Mock that simulates a tool call loop via the Responses API.
 
     Call sequence:
-    1. function_call to get_lease_history
-    2. function_call to get_negotiation_notes
-    3. function_call to lease_comparables
-    4. stop with final analysis
-    5. stop for brief generator formatting
+    1. Initial call returns function_call to get_lease_history
+    2. Second call returns function_call to get_negotiation_notes
+    3. Third call returns function_call to lease_comparables
+    4. Fourth call returns stop with final analysis
 
-    This exercises a realistic 3-tool-call sequence before the final completion.
+    The brief generator (5th call) still uses the old ChatCompletion API.
     """
     mock_brief_json = json.dumps({
         "brief": "Comprehensive mock brief after tool calls.",
@@ -110,46 +126,68 @@ def mock_openai_with_tool_call():
         "crm_intelligence": "SBA Communications is a preferred-tier provider. Account team restructured in Q4 2023.",
     })
 
-    with patch("openai.ChatCompletion.create") as mock_create:
-        mock_create.side_effect = [
-            # Call 1: agent retrieves internal lease history first
-            _build_response("function_call", fn_name="get_lease_history", fn_args={
-                "tower_id": "ATT-FL-4205",
-            }),
-            # Call 2: agent retrieves CRM negotiation notes
-            _build_response("function_call", fn_name="get_negotiation_notes", fn_args={
-                "provider": "sba_communications",
-            }),
-            # Call 3: agent pulls market comparables
-            _build_response("function_call", fn_name="lease_comparables", fn_args={
-                "region": "southeast",
-                "tower_type": "ground_mount",
-            }),
-            # Call 4: agent returns final analysis
-            _build_response("stop", content=(
+    # Build the sequence of Responses API responses for the agent loop
+    responses_sequence = [
+        # Call 1: agent retrieves internal lease history first
+        _make_responses_api_response(
+            output_items=[_make_function_call_item("get_lease_history", {"tower_id": "ATT-FL-4205"}, "call_001")],
+            response_id="resp_tool_001",
+        ),
+        # Call 2: agent retrieves CRM negotiation notes
+        _make_responses_api_response(
+            output_items=[_make_function_call_item("get_negotiation_notes", {"provider": "sba_communications"}, "call_002")],
+            response_id="resp_tool_002",
+        ),
+        # Call 3: agent pulls market comparables
+        _make_responses_api_response(
+            output_items=[_make_function_call_item("lease_comparables", {"region": "southeast", "tower_type": "ground_mount"}, "call_003")],
+            response_id="resp_tool_003",
+        ),
+        # Call 4: agent returns final analysis (no tool calls)
+        _make_responses_api_response(
+            output_items=[_make_text_output_item(
                 "Based on internal lease history, CRM intelligence, and comparable analysis, "
                 "the current rate of $3200/mo is above the regional median of $2800. "
                 "AT&T has strong leverage due to multi-tenant occupancy."
-            )),
-            # Call 5: brief generator formatting
-            _build_response("stop", content=mock_brief_json),
-        ]
-        yield mock_create
+            )],
+            output_text=(
+                "Based on internal lease history, CRM intelligence, and comparable analysis, "
+                "the current rate of $3200/mo is above the regional median of $2800. "
+                "AT&T has strong leverage due to multi-tenant occupancy."
+            ),
+            response_id="resp_final_004",
+        ),
+    ]
+
+    mock_client = MagicMock()
+    mock_client.responses.create.side_effect = responses_sequence
+
+    with patch("towerlease.agents.negotiation_agent._get_client", return_value=mock_client), \
+         patch("openai.ChatCompletion.create") as mock_chat:
+
+        # Brief generator still uses old API
+        mock_chat.return_value = _build_chat_response("stop", content=mock_brief_json)
+
+        yield mock_client, mock_chat
 
 
 @pytest.fixture
 def mock_openai_followup():
-    """Mock for follow-up agent tests."""
+    """Mock for follow-up agent tests (still uses old ChatCompletion API)."""
     with patch("openai.ChatCompletion.create") as mock_create:
-        mock_create.return_value = _build_response(
+        mock_create.return_value = _build_chat_response(
             "stop",
             content="If they push back on comparables, reference the post-2021 Crown Castle master agreement rates.",
         )
         yield mock_create
 
 
-def _build_response(finish_reason, content=None, fn_name=None, fn_args=None):
-    """Helper to build a properly structured mock response dict."""
+def _build_chat_response(finish_reason, content=None, fn_name=None, fn_args=None):
+    """Helper to build a properly structured mock ChatCompletion response dict.
+
+    Used for the brief generator and follow-up agent which still use the
+    old ChatCompletion API.
+    """
     message = {"role": "assistant"}
 
     if finish_reason == "function_call":
