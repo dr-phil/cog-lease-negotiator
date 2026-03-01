@@ -9,13 +9,15 @@ Uses FastAPI's TestClient (httpx-based) to test:
 """
 import json
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from fastapi.testclient import TestClient
 
 from towerlease.server.main import app
 from towerlease.server import session_store
 from towerlease.server.schemas import NegotiateResponse
+from towerlease.agents import negotiation_agent, brief_generator, followup_agent
+from towerlease.tests.conftest import _build_response
 
 
 client = TestClient(app)
@@ -85,23 +87,14 @@ class TestNegotiateEndpoint:
             "crm_intelligence": "Provider has strategic relationship tier with AT&T.",
         })
 
-        with patch("openai.ChatCompletion.create") as mock_create:
-            mock_create.side_effect = [
-                # Negotiation agent: stop immediately
-                {
-                    "choices": [{
-                        "message": {"role": "assistant", "content": "Raw analysis."},
-                        "finish_reason": "stop",
-                    }]
-                },
-                # Brief generator
-                {
-                    "choices": [{
-                        "message": {"role": "assistant", "content": mock_brief_json},
-                        "finish_reason": "stop",
-                    }]
-                },
-            ]
+        mock_create = MagicMock(side_effect=[
+            # Negotiation agent: stop immediately
+            _build_response("stop", content="Raw analysis."),
+            # Brief generator
+            _build_response("stop", content=mock_brief_json),
+        ])
+        with patch.object(negotiation_agent.client.responses, "create", mock_create), \
+             patch.object(brief_generator.client.responses, "create", mock_create):
 
             response = client.post("/api/negotiate", json={
                 "tower_id": "ATT-FL-4205",
@@ -145,16 +138,10 @@ class TestFollowupEndpoint:
         ]
         session_id = session_store.create_session(messages)
 
-        with patch("openai.ChatCompletion.create") as mock_create:
-            mock_create.return_value = {
-                "choices": [{
-                    "message": {
-                        "role": "assistant",
-                        "content": "Here is the follow-up answer.",
-                    },
-                    "finish_reason": "stop",
-                }]
-            }
+        mock_create = MagicMock(return_value=_build_response(
+            "stop", content="Here is the follow-up answer.",
+        ))
+        with patch.object(followup_agent.client.responses, "create", mock_create):
 
             response = client.post("/api/followup", json={
                 "session_id": session_id,
@@ -186,13 +173,10 @@ class TestFollowupEndpoint:
         ]
         session_id = session_store.create_session(messages)
 
-        with patch("openai.ChatCompletion.create") as mock_create:
-            mock_create.return_value = {
-                "choices": [{
-                    "message": {"role": "assistant", "content": "Answer 1."},
-                    "finish_reason": "stop",
-                }]
-            }
+        mock_create = MagicMock(return_value=_build_response(
+            "stop", content="Answer 1.",
+        ))
+        with patch.object(followup_agent.client.responses, "create", mock_create):
 
             client.post("/api/followup", json={
                 "session_id": session_id,

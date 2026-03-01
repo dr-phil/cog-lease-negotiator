@@ -10,12 +10,13 @@ follow-up since the context is already in the conversation history.
 
 Written by dkim@ as a quick addition when the PM asked "can negotiators
 ask follow-up questions?" two days before the demo. It works.
+Migrated to Responses API in 2025.
 """
 import os
 
-import openai
+from openai import OpenAI
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY") or "not-set")
 
 
 _FOLLOWUP_SYSTEM_ADDENDUM = (
@@ -30,18 +31,18 @@ def handle_followup(messages, question):
     """Process a follow-up question using existing conversation context.
 
     Args:
-        messages: list of message dicts from the session store
+        messages: list of input items from the session store
         question: the user's follow-up question string
 
     Returns:
-        tuple of (answer_text, updated_messages_list)
+        tuple of (answer_text, updated_input_items_list)
     """
     # Make a copy so we don't mutate the stored list directly
     # (learned this the hard way -- JIRA-1834)
     updated_messages = list(messages)
 
     # Inject followup context into system message if not already there
-    if updated_messages and updated_messages[0]["role"] == "system":
+    if updated_messages and isinstance(updated_messages[0], dict) and updated_messages[0].get("role") == "system":
         if "follow-up question" not in updated_messages[0]["content"]:
             updated_messages[0] = {
                 "role": "system",
@@ -54,17 +55,14 @@ def handle_followup(messages, question):
         "content": question,
     })
 
-    response = openai.ChatCompletion.create(
+    response = client.responses.create(
         model="gpt-4",
-        messages=updated_messages,
+        input=updated_messages,
     )
 
-    answer = response["choices"][0]["message"]["content"]
+    answer = response.output_text
 
-    # Append the assistant response to history
-    updated_messages.append({
-        "role": "assistant",
-        "content": answer,
-    })
+    # Append the assistant response output items to history
+    updated_messages.extend(response.output)
 
     return answer, updated_messages

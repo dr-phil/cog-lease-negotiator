@@ -1,7 +1,7 @@
 """
 Test fixtures for TowerLease Intelligence.
 
-Mocks openai.ChatCompletion.create to avoid hitting the real API in tests.
+Mocks client.responses.create to avoid hitting the real API in tests.
 Two fixtures:
   - mock_openai_single_turn: returns a stop response directly
   - mock_openai_with_tool_call: simulates a tool call loop (function_call then stop)
@@ -11,6 +11,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 
 from towerlease.server import session_store
+from towerlease.agents import negotiation_agent, brief_generator, followup_agent
 
 
 @pytest.fixture(autouse=True)
@@ -22,33 +23,13 @@ def clear_sessions():
 
 
 def _make_stop_response(content="This is a mock negotiation analysis."):
-    """Build a mock ChatCompletion response with finish_reason: stop."""
-    response = MagicMock()
-    message = {
-        "role": "assistant",
-        "content": content,
-    }
-    response.__getitem__ = lambda self, key: {
-        "choices": [{"message": message, "finish_reason": "stop"}],
-    }[key]
-    return response
+    """Build a mock Responses API response with a text message output."""
+    return _build_response("stop", content=content)
 
 
 def _make_function_call_response(fn_name, fn_args):
-    """Build a mock ChatCompletion response with finish_reason: function_call."""
-    response = MagicMock()
-    message = {
-        "role": "assistant",
-        "content": None,
-        "function_call": {
-            "name": fn_name,
-            "arguments": json.dumps(fn_args),
-        },
-    }
-    response.__getitem__ = lambda self, key: {
-        "choices": [{"message": message, "finish_reason": "function_call"}],
-    }[key]
-    return response
+    """Build a mock Responses API response with a function_call output."""
+    return _build_response("function_call", fn_name=fn_name, fn_args=fn_args)
 
 
 @pytest.fixture
@@ -71,13 +52,14 @@ def mock_openai_single_turn():
         "region_context": "Mock region context for testing.",
     })
 
-    with patch("openai.ChatCompletion.create") as mock_create:
+    mock_create = MagicMock(side_effect=[
         # First call: negotiation agent (single turn -- no tool calls)
+        _build_response("stop", content="Raw analysis: rates are above market median."),
         # Second call: brief generator formatting
-        mock_create.side_effect = [
-            _build_response("stop", content="Raw analysis: rates are above market median."),
-            _build_response("stop", content=mock_brief_json),
-        ]
+        _build_response("stop", content=mock_brief_json),
+    ])
+    with patch.object(negotiation_agent.client.responses, "create", mock_create), \
+         patch.object(brief_generator.client.responses, "create", mock_create):
         yield mock_create
 
 
@@ -110,62 +92,61 @@ def mock_openai_with_tool_call():
         "crm_intelligence": "SBA Communications is a preferred-tier provider. Account team restructured in Q4 2023.",
     })
 
-    with patch("openai.ChatCompletion.create") as mock_create:
-        mock_create.side_effect = [
-            # Call 1: agent retrieves internal lease history first
-            _build_response("function_call", fn_name="get_lease_history", fn_args={
-                "tower_id": "ATT-FL-4205",
-            }),
-            # Call 2: agent retrieves CRM negotiation notes
-            _build_response("function_call", fn_name="get_negotiation_notes", fn_args={
-                "provider": "sba_communications",
-            }),
-            # Call 3: agent pulls market comparables
-            _build_response("function_call", fn_name="lease_comparables", fn_args={
-                "region": "southeast",
-                "tower_type": "ground_mount",
-            }),
-            # Call 4: agent returns final analysis
-            _build_response("stop", content=(
-                "Based on internal lease history, CRM intelligence, and comparable analysis, "
-                "the current rate of $3200/mo is above the regional median of $2800. "
-                "AT&T has strong leverage due to multi-tenant occupancy."
-            )),
-            # Call 5: brief generator formatting
-            _build_response("stop", content=mock_brief_json),
-        ]
+    mock_create = MagicMock(side_effect=[
+        # Call 1: agent retrieves internal lease history first
+        _build_response("function_call", fn_name="get_lease_history", fn_args={
+            "tower_id": "ATT-FL-4205",
+        }),
+        # Call 2: agent retrieves CRM negotiation notes
+        _build_response("function_call", fn_name="get_negotiation_notes", fn_args={
+            "provider": "sba_communications",
+        }),
+        # Call 3: agent pulls market comparables
+        _build_response("function_call", fn_name="lease_comparables", fn_args={
+            "region": "southeast",
+            "tower_type": "ground_mount",
+        }),
+        # Call 4: agent returns final analysis
+        _build_response("stop", content=(
+            "Based on internal lease history, CRM intelligence, and comparable analysis, "
+            "the current rate of $3200/mo is above the regional median of $2800. "
+            "AT&T has strong leverage due to multi-tenant occupancy."
+        )),
+        # Call 5: brief generator formatting
+        _build_response("stop", content=mock_brief_json),
+    ])
+    with patch.object(negotiation_agent.client.responses, "create", mock_create), \
+         patch.object(brief_generator.client.responses, "create", mock_create):
         yield mock_create
 
 
 @pytest.fixture
 def mock_openai_followup():
     """Mock for follow-up agent tests."""
-    with patch("openai.ChatCompletion.create") as mock_create:
-        mock_create.return_value = _build_response(
-            "stop",
-            content="If they push back on comparables, reference the post-2021 Crown Castle master agreement rates.",
-        )
+    mock_create = MagicMock(return_value=_build_response(
+        "stop",
+        content="If they push back on comparables, reference the post-2021 Crown Castle master agreement rates.",
+    ))
+    with patch.object(followup_agent.client.responses, "create", mock_create):
         yield mock_create
 
 
 def _build_response(finish_reason, content=None, fn_name=None, fn_args=None):
-    """Helper to build a properly structured mock response dict."""
-    message = {"role": "assistant"}
+    """Helper to build a properly structured mock Responses API response object."""
+    response = MagicMock()
 
     if finish_reason == "function_call":
-        message["content"] = None
-        message["function_call"] = {
-            "name": fn_name,
-            "arguments": json.dumps(fn_args) if fn_args else "{}",
-        }
+        fc_item = MagicMock()
+        fc_item.type = "function_call"
+        fc_item.name = fn_name
+        fc_item.arguments = json.dumps(fn_args) if fn_args else "{}"
+        fc_item.call_id = "call_%s" % fn_name
+        response.output = [fc_item]
+        response.output_text = None
     else:
-        message["content"] = content or ""
+        msg_item = MagicMock()
+        msg_item.type = "message"
+        response.output = [msg_item]
+        response.output_text = content or ""
 
-    return {
-        "choices": [
-            {
-                "message": message,
-                "finish_reason": finish_reason,
-            }
-        ]
-    }
+    return response

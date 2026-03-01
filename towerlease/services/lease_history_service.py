@@ -156,6 +156,7 @@ def get_lease_history(tower_id):
 
 
 TOOL_DEFINITION = {
+    "type": "function",
     "name": "get_lease_history",
     "description": (
         "Retrieve historical lease negotiation data for a tower from the "

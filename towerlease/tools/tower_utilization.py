@@ -92,6 +92,7 @@ def lookup(tower_id):
 
 
 TOOL_DEFINITION = {
+    "type": "function",
     "name": "tower_utilization",
     "description": (
         "Get current utilization data for a tower including tenant list, "

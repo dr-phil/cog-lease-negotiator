@@ -81,6 +81,7 @@ def lookup(tower_id):
 
 
 TOOL_DEFINITION = {
+    "type": "function",
     "name": "property_lookup",
     "description": (
         "Look up property records for a tower site including owner information, "

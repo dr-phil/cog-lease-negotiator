@@ -92,6 +92,7 @@ def lookup(region, tower_type, provider=None):
 
 
 TOOL_DEFINITION = {
+    "type": "function",
     "name": "lease_comparables",
     "description": (
         "Find comparable tower lease rates in the same region and for the same "

@@ -9,7 +9,7 @@ Covers:
 """
 import json
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from towerlease.agents.negotiation_agent import (
     run_negotiation_agent,
@@ -17,11 +17,13 @@ from towerlease.agents.negotiation_agent import (
     build_system_prompt,
     build_initial_message,
 )
+from towerlease.agents import negotiation_agent, brief_generator, followup_agent
 from towerlease.agents.brief_generator import generate_brief
 from towerlease.agents.followup_agent import handle_followup
 from towerlease.server import session_store
 from towerlease.services.lease_history_service import get_lease_history
 from towerlease.services.negotiation_notes_service import get_negotiation_notes
+from towerlease.tests.conftest import _build_response
 
 
 # -- Tool dispatch tests --
@@ -133,7 +135,7 @@ class TestNegotiationAgent:
 
     def test_tool_call_flow(self, mock_openai_with_tool_call):
         """Test the full agent loop with tool calls."""
-        result, messages = run_negotiation_agent(
+        result, input_items = run_negotiation_agent(
             tower_id="ATT-FL-4205",
             lease_data={
                 "tower_id": "ATT-FL-4205",
@@ -147,18 +149,18 @@ class TestNegotiationAgent:
         assert result is not None
         assert "above" in result.lower() or "median" in result.lower()
 
-        # Should have system + user + (fn_call + fn_result) * 3 + final assistant
-        assert len(messages) >= 8
+        # Should have system + user + (fn_call_output + fn_call_item) * 3 + final output
+        assert len(input_items) >= 8
 
-        # Verify tool call messages are in the history
-        fn_messages = [m for m in messages if m.get("role") == "function"]
-        assert len(fn_messages) == 3
+        # Verify function_call_output items are in the history
+        fn_outputs = [m for m in input_items if isinstance(m, dict) and m.get("type") == "function_call_output"]
+        assert len(fn_outputs) == 3
 
-        # Verify the new tools are called first in the sequence
-        fn_names = [m["name"] for m in messages if m.get("role") == "function"]
-        assert fn_names[0] == "get_lease_history"
-        assert fn_names[1] == "get_negotiation_notes"
-        assert fn_names[2] == "lease_comparables"
+        # Verify the tools are called in the correct sequence via function_call items
+        fn_calls = [m for m in input_items if not isinstance(m, dict) and getattr(m, "type", None) == "function_call"]
+        assert fn_calls[0].name == "get_lease_history"
+        assert fn_calls[1].name == "get_negotiation_notes"
+        assert fn_calls[2].name == "lease_comparables"
 
 
 class TestNegotiationPerProvider:
@@ -167,17 +169,11 @@ class TestNegotiationPerProvider:
     @pytest.fixture(autouse=True)
     def _setup_mock(self):
         """Set up a simple single-turn mock for all provider tests."""
-        with patch("openai.ChatCompletion.create") as mock:
-            mock.return_value = {
-                "choices": [{
-                    "message": {
-                        "role": "assistant",
-                        "content": "Analysis complete for this provider.",
-                    },
-                    "finish_reason": "stop",
-                }]
-            }
-            self.mock_create = mock
+        mock_create = MagicMock(return_value=_build_response(
+            "stop", content="Analysis complete for this provider.",
+        ))
+        with patch.object(negotiation_agent.client.responses, "create", mock_create):
+            self.mock_create = mock_create
             yield
 
     def _run_for_provider(self, provider, region):
@@ -224,24 +220,18 @@ class TestBriefGenerator:
         # The mock_openai_single_turn has two responses queued;
         # we need to consume the first one (negotiation agent) before
         # the brief generator call. So we use a fresh mock here.
-        with patch("openai.ChatCompletion.create") as mock_create:
-            mock_create.return_value = {
-                "choices": [{
-                    "message": {
-                        "role": "assistant",
-                        "content": json.dumps({
-                            "brief": "Test brief",
-                            "recommended_opening_rate": 2800,
-                            "walk_away_rate": 3100,
-                            "key_leverage_points": ["point1"],
-                            "comparable_rates": {"low": 2600, "median": 3000, "high": 3800},
-                            "provider_context": "ctx",
-                            "region_context": "rctx",
-                        }),
-                    },
-                    "finish_reason": "stop",
-                }]
-            }
+        mock_create = MagicMock(return_value=_build_response(
+            "stop", content=json.dumps({
+                "brief": "Test brief",
+                "recommended_opening_rate": 2800,
+                "walk_away_rate": 3100,
+                "key_leverage_points": ["point1"],
+                "comparable_rates": {"low": 2600, "median": 3000, "high": 3800},
+                "provider_context": "ctx",
+                "region_context": "rctx",
+            }),
+        ))
+        with patch.object(brief_generator.client.responses, "create", mock_create):
             brief = generate_brief(raw, tower_data)
 
         assert "brief" in brief
@@ -252,16 +242,10 @@ class TestBriefGenerator:
 
     def test_brief_fallback_on_bad_json(self):
         """Test that brief generator handles malformed JSON gracefully."""
-        with patch("openai.ChatCompletion.create") as mock_create:
-            mock_create.return_value = {
-                "choices": [{
-                    "message": {
-                        "role": "assistant",
-                        "content": "This is not JSON at all",
-                    },
-                    "finish_reason": "stop",
-                }]
-            }
+        mock_create = MagicMock(return_value=_build_response(
+            "stop", content="This is not JSON at all",
+        ))
+        with patch.object(brief_generator.client.responses, "create", mock_create):
             brief = generate_brief("raw analysis text", {"current_monthly_rate": 3000})
 
         # Should fall back to default structure
@@ -286,27 +270,21 @@ class TestSparseDataPath:
         assert notes_rural["crm_data_quality"] == "low"
 
         # Now test the full brief generation path with sparse data
-        with patch("openai.ChatCompletion.create") as mock_create:
-            mock_brief_json = json.dumps({
-                "brief": "Brief for municipal tower.",
-                "recommended_opening_rate": 2000,
-                "walk_away_rate": 2300,
-                "key_leverage_points": ["Limited CRM data available"],
-                "comparable_rates": {"low": 1800, "median": 2200, "high": 2800},
-                "provider_context": "Municipal provider with limited relationship data.",
-                "region_context": "Midwest region context.",
-                "negotiation_history_summary": "Limited lease history data available (data quality: low).",
-                "crm_intelligence": "Limited CRM data available. sparse_data_warning flagged -- CRM records are incomplete for this provider.",
-            })
-            mock_create.return_value = {
-                "choices": [{
-                    "message": {
-                        "role": "assistant",
-                        "content": mock_brief_json,
-                    },
-                    "finish_reason": "stop",
-                }]
-            }
+        mock_brief_json = json.dumps({
+            "brief": "Brief for municipal tower.",
+            "recommended_opening_rate": 2000,
+            "walk_away_rate": 2300,
+            "key_leverage_points": ["Limited CRM data available"],
+            "comparable_rates": {"low": 1800, "median": 2200, "high": 2800},
+            "provider_context": "Municipal provider with limited relationship data.",
+            "region_context": "Midwest region context.",
+            "negotiation_history_summary": "Limited lease history data available (data quality: low).",
+            "crm_intelligence": "Limited CRM data available. sparse_data_warning flagged -- CRM records are incomplete for this provider.",
+        })
+        mock_create = MagicMock(return_value=_build_response(
+            "stop", content=mock_brief_json,
+        ))
+        with patch.object(brief_generator.client.responses, "create", mock_create):
             brief = generate_brief(
                 "Raw analysis with sparse CRM data.",
                 {"current_monthly_rate": 2400},
@@ -330,9 +308,10 @@ class TestFollowupAgent:
         answer, updated = handle_followup(messages, "What about comparables?")
         assert answer is not None
         assert len(updated) > len(messages)
-        # Should have added user question and assistant response
+        # Second-to-last should be the user question (a dict)
         assert updated[-2]["role"] == "user"
-        assert updated[-1]["role"] == "assistant"
+        # Last item should be the response output item (a mock with type="message")
+        assert getattr(updated[-1], "type", None) == "message"
 
     def test_followup_preserves_history(self, mock_openai_followup):
         """Test that follow-up doesn't mutate the original messages."""

@@ -4,7 +4,7 @@ Brief generator module.
 Takes the raw agent output from the negotiation agent and formats it into
 the structured JSON response shape expected by the API.
 
-This is deliberately a separate ChatCompletion call rather than doing it
+This is deliberately a separate Responses API call rather than doing it
 in one shot. The original design had the negotiation agent return unstructured
 text and this module was added later to impose structure. Classic organic
 growth pattern -- works fine, just a bit wasteful on tokens.
@@ -16,9 +16,9 @@ growth pattern -- works fine, just a bit wasteful on tokens.
 import os
 import json
 
-import openai
+from openai import OpenAI
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY") or "not-set")
 
 
 _FORMATTING_PROMPT = """You are a formatting assistant for AT&T's tower lease negotiation system.
@@ -64,16 +64,16 @@ def generate_brief(raw_analysis, tower_data):
         % (raw_analysis, current_rate)
     )
 
-    response = openai.ChatCompletion.create(
+    response = client.responses.create(
         model="gpt-4",
-        messages=[
+        input=[
             {"role": "system", "content": _FORMATTING_PROMPT},
             {"role": "user", "content": user_msg},
         ],
         temperature=0.2,  # low temp for structured output
     )
 
-    content = response["choices"][0]["message"]["content"]
+    content = response.output_text
 
     try:
         brief_data = json.loads(content)

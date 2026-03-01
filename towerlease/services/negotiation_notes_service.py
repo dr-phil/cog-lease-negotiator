@@ -180,6 +180,7 @@ def get_negotiation_notes(provider, landlord_id=None):
 
 
 TOOL_DEFINITION = {
+    "type": "function",
     "name": "get_negotiation_notes",
     "description": (
         "Retrieve negotiation intelligence from the internal NegotiatorCRM "
