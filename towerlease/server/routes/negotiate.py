@@ -4,12 +4,16 @@ Negotiation endpoint.
 POST /api/negotiate -- kicks off the negotiation agent, generates a
 structured brief, and returns it along with a session ID for follow-up.
 """
-from fastapi import APIRouter
+import logging
+
+from fastapi import APIRouter, HTTPException
 
 from towerlease.server.schemas import NegotiateRequest, NegotiateResponse
 from towerlease.agents.negotiation_agent import run_negotiation_agent
 from towerlease.agents.brief_generator import generate_brief
 from towerlease.server import session_store
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -23,6 +27,11 @@ def negotiate(request: NegotiateRequest):
     2. Passes the raw output through the brief generator
     3. Stores the conversation in session state for follow-up
     4. Returns the structured brief
+
+    Errors from the OpenAI SDK or agent pipeline are caught and
+    re-raised as HTTPException so the response passes through
+    CORSMiddleware (an unhandled 500 from Starlette's
+    ServerErrorMiddleware bypasses CORS headers).
     """
     lease_data = {
         "tower_id": request.tower_id,
@@ -31,16 +40,20 @@ def negotiate(request: NegotiateRequest):
         "lease_years_remaining": request.lease_years_remaining,
     }
 
-    # Step 1: Run the negotiation agent
-    raw_analysis, messages = run_negotiation_agent(
-        tower_id=request.tower_id,
-        lease_data=lease_data,
-        provider=request.provider,
-        region=request.region,
-    )
+    try:
+        # Step 1: Run the negotiation agent
+        raw_analysis, messages = run_negotiation_agent(
+            tower_id=request.tower_id,
+            lease_data=lease_data,
+            provider=request.provider,
+            region=request.region,
+        )
 
-    # Step 2: Generate structured brief
-    brief_data = generate_brief(raw_analysis, lease_data)
+        # Step 2: Generate structured brief
+        brief_data = generate_brief(raw_analysis, lease_data)
+    except Exception as exc:
+        logger.exception("Negotiation pipeline failed for tower %s", request.tower_id)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
     # Step 3: Store session for follow-up
     session_id = session_store.create_session(messages)

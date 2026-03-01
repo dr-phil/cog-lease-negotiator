@@ -7,6 +7,9 @@ CORS is configured for localhost:4200 (Angular dev server).
 To run:
     uvicorn towerlease.server.main:app --reload --port 8000
 """
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
