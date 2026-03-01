@@ -32,7 +32,7 @@ def negotiate(request: NegotiateRequest):
     }
 
     # Step 1: Run the negotiation agent
-    raw_analysis, messages = run_negotiation_agent(
+    raw_analysis, response_id = run_negotiation_agent(
         tower_id=request.tower_id,
         lease_data=lease_data,
         provider=request.provider,
@@ -43,7 +43,8 @@ def negotiate(request: NegotiateRequest):
     brief_data = generate_brief(raw_analysis, lease_data)
 
     # Step 3: Store session for follow-up
-    session_id = session_store.create_session(messages)
+    # Now stores the Responses API response ID instead of messages list
+    session_id = session_store.create_session(response_id)
 
     # Step 4: Build response
     return NegotiateResponse(

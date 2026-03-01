@@ -9,7 +9,7 @@ Uses FastAPI's TestClient (httpx-based) to test:
 """
 import json
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from fastapi.testclient import TestClient
 
@@ -73,6 +73,8 @@ class TestTowersEndpoint:
 class TestNegotiateEndpoint:
     def test_negotiate_returns_correct_shape(self):
         """Test POST /api/negotiate returns the expected response structure."""
+        from towerlease.tests.conftest import _make_responses_api_response, _make_text_output_item
+
         mock_brief_json = json.dumps({
             "brief": "Test negotiation brief.",
             "recommended_opening_rate": 2800,
@@ -85,23 +87,26 @@ class TestNegotiateEndpoint:
             "crm_intelligence": "Provider has strategic relationship tier with AT&T.",
         })
 
-        with patch("openai.ChatCompletion.create") as mock_create:
-            mock_create.side_effect = [
-                # Negotiation agent: stop immediately
-                {
-                    "choices": [{
-                        "message": {"role": "assistant", "content": "Raw analysis."},
-                        "finish_reason": "stop",
-                    }]
-                },
-                # Brief generator
-                {
-                    "choices": [{
-                        "message": {"role": "assistant", "content": mock_brief_json},
-                        "finish_reason": "stop",
-                    }]
-                },
-            ]
+        # Mock the Responses API for the negotiation agent
+        agent_response = _make_responses_api_response(
+            output_items=[_make_text_output_item("Raw analysis.")],
+            output_text="Raw analysis.",
+            response_id="resp_server_test_001",
+        )
+
+        mock_client = MagicMock()
+        mock_client.responses.create.return_value = agent_response
+
+        with patch("towerlease.agents.negotiation_agent._get_client", return_value=mock_client), \
+             patch("openai.ChatCompletion.create") as mock_chat:
+
+            # Brief generator still uses old API
+            mock_chat.return_value = {
+                "choices": [{
+                    "message": {"role": "assistant", "content": mock_brief_json},
+                    "finish_reason": "stop",
+                }]
+            }
 
             response = client.post("/api/negotiate", json={
                 "tower_id": "ATT-FL-4205",

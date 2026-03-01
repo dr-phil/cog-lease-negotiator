@@ -9,7 +9,7 @@ Covers:
 """
 import json
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from towerlease.agents.negotiation_agent import (
     run_negotiation_agent,
@@ -117,7 +117,8 @@ class TestPromptBuilding:
 class TestNegotiationAgent:
     def test_single_turn_flow(self, mock_openai_single_turn):
         """Test agent with no tool calls -- direct stop response."""
-        result, messages = run_negotiation_agent(
+        mock_client, _ = mock_openai_single_turn
+        result, response_id = run_negotiation_agent(
             tower_id="ATT-FL-4205",
             lease_data={
                 "tower_id": "ATT-FL-4205",
@@ -129,11 +130,12 @@ class TestNegotiationAgent:
             region="southeast",
         )
         assert result is not None
-        assert len(messages) >= 3  # system + user + assistant
+        assert isinstance(response_id, str)
 
     def test_tool_call_flow(self, mock_openai_with_tool_call):
         """Test the full agent loop with tool calls."""
-        result, messages = run_negotiation_agent(
+        mock_client, _ = mock_openai_with_tool_call
+        result, response_id = run_negotiation_agent(
             tower_id="ATT-FL-4205",
             lease_data={
                 "tower_id": "ATT-FL-4205",
@@ -146,19 +148,19 @@ class TestNegotiationAgent:
         )
         assert result is not None
         assert "above" in result.lower() or "median" in result.lower()
+        assert isinstance(response_id, str)
 
-        # Should have system + user + (fn_call + fn_result) * 3 + final assistant
-        assert len(messages) >= 8
+        # Verify the Responses API was called 4 times (3 tool calls + final)
+        assert mock_client.responses.create.call_count == 4
 
-        # Verify tool call messages are in the history
-        fn_messages = [m for m in messages if m.get("role") == "function"]
-        assert len(fn_messages) == 3
-
-        # Verify the new tools are called first in the sequence
-        fn_names = [m["name"] for m in messages if m.get("role") == "function"]
-        assert fn_names[0] == "get_lease_history"
-        assert fn_names[1] == "get_negotiation_notes"
-        assert fn_names[2] == "lease_comparables"
+        # Verify tool outputs were passed back with correct call_ids
+        # Calls 2-4 should have previous_response_id and tool outputs
+        for i, call_args in enumerate(mock_client.responses.create.call_args_list[1:], start=1):
+            assert "previous_response_id" in call_args.kwargs
+            assert "input" in call_args.kwargs
+            tool_outputs = call_args.kwargs["input"]
+            assert len(tool_outputs) == 1
+            assert tool_outputs[0]["type"] == "function_call_output"
 
 
 class TestNegotiationPerProvider:
@@ -167,17 +169,16 @@ class TestNegotiationPerProvider:
     @pytest.fixture(autouse=True)
     def _setup_mock(self):
         """Set up a simple single-turn mock for all provider tests."""
-        with patch("openai.ChatCompletion.create") as mock:
-            mock.return_value = {
-                "choices": [{
-                    "message": {
-                        "role": "assistant",
-                        "content": "Analysis complete for this provider.",
-                    },
-                    "finish_reason": "stop",
-                }]
-            }
-            self.mock_create = mock
+        from towerlease.tests.conftest import _make_responses_api_response, _make_text_output_item
+        agent_response = _make_responses_api_response(
+            output_items=[_make_text_output_item("Analysis complete for this provider.")],
+            output_text="Analysis complete for this provider.",
+            response_id="resp_provider_test",
+        )
+        mock_client = MagicMock()
+        mock_client.responses.create.return_value = agent_response
+        with patch("towerlease.agents.negotiation_agent._get_client", return_value=mock_client):
+            self.mock_client = mock_client
             yield
 
     def _run_for_provider(self, provider, region):
