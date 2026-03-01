@@ -10,9 +10,8 @@ To run:
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
 from towerlease.server.routes import towers, negotiate, followup
 
@@ -36,21 +35,6 @@ app.add_middleware(
 app.include_router(towers.router)
 app.include_router(negotiate.router)
 app.include_router(followup.router)
-
-
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    """Return a JSON 500 so the response goes through CORSMiddleware.
-
-    Without this, unhandled exceptions are caught by Starlette's
-    ServerErrorMiddleware *outside* the CORS layer, producing a plain-text
-    500 with no Access-Control-Allow-Origin header.  The browser then
-    reports a CORS error instead of the real 500.
-    """
-    return JSONResponse(
-        status_code=500,
-        content={"detail": str(exc)},
-    )
 
 
 @app.get("/health")
