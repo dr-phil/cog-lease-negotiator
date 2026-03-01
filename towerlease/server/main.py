@@ -5,7 +5,7 @@ This serves as the backend for the Angular frontend (coming in Q2).
 CORS is configured for localhost:4200 (Angular dev server).
 
 To run:
-    uvicorn towerlease.server.main:app --reload --port 8000
+    uvicorn towerlease.server.main:app --reload --port 8001
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
