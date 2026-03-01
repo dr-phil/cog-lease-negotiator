@@ -81,20 +81,23 @@ def lookup(tower_id):
 
 
 TOOL_DEFINITION = {
-    "name": "property_lookup",
-    "description": (
-        "Look up property records for a tower site including owner information, "
-        "parcel details, assessed value, lot size, and zoning classification. "
-        "Use this to understand the property context for lease negotiations."
-    ),
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "tower_id": {
-                "type": "string",
-                "description": "The AT&T tower identifier (e.g. ATT-TX-4821)",
-            }
+    "type": "function",
+    "function": {
+        "name": "property_lookup",
+        "description": (
+            "Look up property records for a tower site including owner information, "
+            "parcel details, assessed value, lot size, and zoning classification. "
+            "Use this to understand the property context for lease negotiations."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "tower_id": {
+                    "type": "string",
+                    "description": "The AT&T tower identifier (e.g. ATT-TX-4821)",
+                }
+            },
+            "required": ["tower_id"],
         },
-        "required": ["tower_id"],
     },
 }
