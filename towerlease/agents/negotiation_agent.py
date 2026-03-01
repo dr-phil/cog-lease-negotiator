@@ -2,7 +2,7 @@
 Core negotiation agent loop.
 
 This is the main agentic loop that drives the negotiation brief generation.
-It uses the old openai SDK pattern (pre-1.0) with manual function call parsing.
+It uses the OpenAI Responses API (client.responses.create) with function tools.
 
 The agent makes multiple tool calls to gather context before synthesizing
 a negotiation brief. Typical flow:
@@ -12,12 +12,13 @@ a negotiation brief. Typical flow:
 
 Originally written by dkim@ in 2023-Q1, refactored by jcrawford@ in 2023-Q3
 to add the provider/region system prompt injection.
+Migrated to Responses API in 2025.
 """
 import os
 import json
 import importlib
 
-import openai
+from openai import OpenAI
 
 from towerlease.tools import property_lookup
 from towerlease.tools import lease_comparables
@@ -26,9 +27,9 @@ from towerlease.tools import regulatory_lookup
 from towerlease.services import lease_history_service
 from towerlease.services import negotiation_notes_service
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY") or "not-set")
 
-# Tool definitions in the old functions format
+# Tool definitions in the Responses API tools format
 TOOL_DEFINITIONS = [
     property_lookup.TOOL_DEFINITION,
     lease_comparables.TOOL_DEFINITION,
@@ -137,8 +138,8 @@ def build_initial_message(tower_id, lease_data, provider, region):
 def run_negotiation_agent(tower_id, lease_data, provider, region):
     """Execute the full negotiation agent loop.
 
-    This function runs a while loop that continues making ChatCompletion
-    calls until the model returns a final response (finish_reason == "stop").
+    This function runs a while loop that continues making Responses API
+    calls until the model returns a final text response (no more tool calls).
     The model can make function calls which are dispatched to mock tools
     and the results fed back into the conversation.
 
@@ -149,51 +150,57 @@ def run_negotiation_agent(tower_id, lease_data, provider, region):
         region: region identifier string
 
     Returns:
-        tuple of (final_response_text, messages_list)
+        tuple of (final_response_text, input_items_list)
     """
     system_prompt = build_system_prompt(provider, region)
 
-    messages = [
+    input_items = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": build_initial_message(tower_id, lease_data, provider, region)},
     ]
 
-    # Agent loop -- keep calling until we get a stop response
+    # Agent loop -- keep calling until we get a response with no tool calls
     max_iterations = 10  # safety valve, shouldn't need more than 5-6
     iteration = 0
 
     while iteration < max_iterations:
         iteration += 1
 
-        response = openai.ChatCompletion.create(
+        response = client.responses.create(
             model="gpt-4",
-            messages=messages,
-            functions=TOOL_DEFINITIONS,
-            function_call="auto",
+            input=input_items,
+            tools=TOOL_DEFINITIONS,
         )
 
-        message = response["choices"][0]["message"]
-        finish_reason = response["choices"][0]["finish_reason"]
+        # Check if the response contains any function calls
+        function_calls = [
+            item for item in response.output
+            if getattr(item, "type", None) == "function_call"
+        ]
 
-        if finish_reason == "function_call":
-            fn_name = message["function_call"]["name"]
-            fn_args = json.loads(message["function_call"]["arguments"])
+        if function_calls:
+            # Add all output items (including the function call items) to input
+            input_items.extend(response.output)
 
-            result = dispatch_tool(fn_name, fn_args)
+            # Process each function call and add results
+            for fc_item in function_calls:
+                fn_name = fc_item.name
+                fn_args = json.loads(fc_item.arguments)
 
-            # Append the assistant message with the function call
-            messages.append(message)
-            # Append the function result
-            messages.append({
-                "role": "function",
-                "name": fn_name,
-                "content": json.dumps(result),
-            })
+                result = dispatch_tool(fn_name, fn_args)
 
-        elif finish_reason == "stop":
-            messages.append(message)
-            return message["content"], messages
+                # Append the function call output
+                input_items.append({
+                    "type": "function_call_output",
+                    "call_id": fc_item.call_id,
+                    "output": json.dumps(result),
+                })
+
+        else:
+            # No tool calls -- this is the final response
+            input_items.extend(response.output)
+            return response.output_text, input_items
 
     # If we hit max iterations, return whatever we have
     # This shouldn't happen in practice but better than infinite loop
-    return messages[-1].get("content", "Agent loop exceeded maximum iterations"), messages
+    return response.output_text or "Agent loop exceeded maximum iterations", input_items

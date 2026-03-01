@@ -99,6 +99,7 @@ def lookup(region, tower_type):
 
 
 TOOL_DEFINITION = {
+    "type": "function",
     "name": "regulatory_lookup",
     "description": (
         "Look up state and local regulatory context for tower siting in a "
